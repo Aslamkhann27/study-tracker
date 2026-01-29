@@ -1,0 +1,132 @@
+/* -------------------------
+   GLOBAL STYLES
+-------------------------- */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #f4f6f8;
+    color: #333;
+}
+
+/* -------------------------
+   NAVIGATION BAR
+-------------------------- */
+
+nav {
+    background-color: #1e293b;
+    padding: 12px;
+    text-align: center;
+}
+
+nav a {
+    color: #ffffff;
+    margin: 0 12px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+nav a:hover {
+    text-decoration: underline;
+}
+
+/* -------------------------
+   PAGE CONTAINER
+-------------------------- */
+
+.container {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+/* -------------------------
+   HEADINGS
+-------------------------- */
+
+h1 {
+    margin-bottom: 5px;
+    color: #1e293b;
+}
+
+h2 {
+    margin-bottom: 10px;
+    color: #334155;
+}
+
+p {
+    margin-top: 5px;
+}
+
+/* -------------------------
+   CARD DESIGN
+-------------------------- */
+
+.card {
+    background-color: #ffffff;
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.05);
+}
+
+/* -------------------------
+   FORM ELEMENTS
+-------------------------- */
+
+label {
+    display: block;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+input, select {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border-radius: 4px;
+    border: 1px solid #cbd5e1;
+}
+
+button {
+    margin-top: 10px;
+    padding: 10px;
+    width: 100%;
+    background-color: #2563eb;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #1d4ed8;
+}
+
+/* -------------------------
+   LIST STYLES
+-------------------------- */
+
+ul {
+    padding-left: 20px;
+}
+
+li {
+    margin-bottom: 5px;
+}
+
+/* -------------------------
+   RESPONSIVE (BASIC)
+-------------------------- */
+
+@media (max-width: 600px) {
+    nav a {
+        display: block;
+        margin: 8px 0;
+    }
+}

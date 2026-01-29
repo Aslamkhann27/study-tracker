@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Today | Study Tracker</title>
+
+    <!-- Common CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="progress.html">Progress</a>
+        <a href="today.html">Today</a>
+        <a href="ideal.html">Ideal</a>
+        <a href="analysis.html">Analysis</a>
+        <a href="forecast.html">Forecast</a>
+    </nav>
+
+    <hr>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <h1>Today's Learning</h1>
+        <p>Plan and record what you study today</p>
+
+        <!-- Select Subject -->
+        <div class="card">
+            <h2>📚 Subject Selection</h2>
+
+            <label for="subjectSelect">Select Subject</label>
+            <select id="subjectSelect"></select>
+        </div>
+
+        <!-- Target Setting -->
+        <div class="card">
+            <h2>🎯 Today's Target</h2>
+
+            <label for="todayTarget">Target for Today (hours / units)</label>
+            <input type="number" id="todayTarget" placeholder="Enter today's target">
+        </div>
+
+        <!-- Actual Study -->
+        <div class="card">
+            <h2>✍️ Actual Study Done</h2>
+
+            <label for="actualStudy">Actual Study Completed Today</label>
+            <input type="number" id="actualStudy" placeholder="Enter actual study done">
+        </div>
+
+        <!-- Save Button -->
+        <div class="card">
+            <button onclick="saveTodayData()">Save Today's Data</button>
+        </div>
+
+        <!-- Daily Summary -->
+        <div class="card">
+            <h2>📊 Today's Summary</h2>
+            <p><strong>Target:</strong> <span id="summaryTarget">0</span></p>
+            <p><strong>Actual:</strong> <span id="summaryActual">0</span></p>
+            <p><strong>Completion:</strong> <span id="summaryCompletion">0%</span></p>
+            <p><strong>Difference:</strong> <span id="summaryDifference">0</span></p>
+        </div>
+
+    </div>
+
+    <!-- Common JavaScript -->
+    <script src="script.js"></script>
+    <script>
+        // Load subjects and today's data when page loads
+        loadTodayPage();
+    </script>
+
+</body>
+</html>

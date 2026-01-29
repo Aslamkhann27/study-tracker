@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Forecast | Study Tracker</title>
+
+    <!-- Common CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="progress.html">Progress</a>
+        <a href="today.html">Today</a>
+        <a href="ideal.html">Ideal</a>
+        <a href="analysis.html">Analysis</a>
+        <a href="forecast.html">Forecast</a>
+    </nav>
+
+    <hr>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <h1>Completion Forecast</h1>
+        <p>Predict how long it will take to complete your learning goals</p>
+
+        <!-- Current Status -->
+        <div class="card">
+            <h2>📌 Current Status</h2>
+            <p><strong>Total Study Completed:</strong> <span id="completedStudy">0</span></p>
+            <p><strong>Total Study Required:</strong> <span id="requiredStudy">0</span></p>
+            <p><strong>Remaining Study:</strong> <span id="remainingStudy">0</span></p>
+        </div>
+
+        <!-- Average Performance -->
+        <div class="card">
+            <h2>📈 Average Performance</h2>
+            <p><strong>Average Daily Study:</strong> <span id="averageDaily">0</span></p>
+            <p><strong>Total Days Tracked:</strong> <span id="totalDays">0</span></p>
+        </div>
+
+        <!-- Forecast Result -->
+        <div class="card">
+            <h2>🧮 Forecast Result</h2>
+            <p><strong>Estimated Days to Completion:</strong></p>
+            <p id="estimatedDays"><strong>0 days</strong></p>
+        </div>
+
+        <!-- Explanation -->
+        <div class="card">
+            <h2>🧠 How This Is Calculated</h2>
+            <p>
+                Estimated Days = Remaining Study ÷ Average Daily Study
+            </p>
+            <p>
+                This prediction is based on your past learning behavior.
+            </p>
+        </div>
+
+    </div>
+
+    <!-- Common JavaScript -->
+    <script src="script.js"></script>
+    <script>
+        // Load forecast calculations
+        loadForecastPage();
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ideal Student | Study Tracker</title>
+
+    <!-- Common CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="progress.html">Progress</a>
+        <a href="today.html">Today</a>
+        <a href="ideal.html">Ideal</a>
+        <a href="analysis.html">Analysis</a>
+        <a href="forecast.html">Forecast</a>
+    </nav>
+
+    <hr>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <h1>Ideal Student Comparison</h1>
+        <p>Compare your learning with an ideal study model</p>
+
+        <!-- Ideal Student Today -->
+        <div class="card">
+            <h2>📅 Ideal Student Today</h2>
+            <p><strong>Ideal Study Today:</strong> <span id="idealToday">0</span></p>
+            <p><strong>Your Study Today:</strong> <span id="yourToday">0</span></p>
+            <p><strong>Gap Today:</strong> <span id="todayGap">0</span></p>
+        </div>
+
+        <!-- Ideal Student Overall -->
+        <div class="card">
+            <h2>📊 Overall Comparison</h2>
+            <p><strong>Ideal Total Study:</strong> <span id="idealTotal">0</span></p>
+            <p><strong>Your Total Study:</strong> <span id="yourTotal">0</span></p>
+            <p><strong>Total Gap:</strong> <span id="totalGap">0</span></p>
+        </div>
+
+        <!-- Interpretation -->
+        <div class="card">
+            <h2>🧠 Interpretation</h2>
+            <p id="interpretationText">No data available</p>
+        </div>
+
+    </div>
+
+    <!-- Common JavaScript -->
+    <script src="script.js"></script>
+    <script>
+        // Load Ideal Student comparison data
+        loadIdealPage();
+    </script>
+
+</body>
+</html>

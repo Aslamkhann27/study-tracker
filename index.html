@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Home | Study Tracker</title>
+
+    <!-- Common CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="progress.html">Progress</a>
+        <a href="today.html">Today</a>
+        <a href="ideal.html">Ideal</a>
+        <a href="analysis.html">Analysis</a>
+        <a href="forecast.html">Forecast</a>
+    </nav>
+
+    <hr>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <h1>Dashboard</h1>
+        <p>Daily overview of your learning</p>
+
+        <!-- Streak Section -->
+        <div class="card">
+            <h2>🔥 Current Streak</h2>
+            <p id="streakValue">0 days</p>
+        </div>
+
+        <!-- Today's Target -->
+        <div class="card">
+            <h2>🎯 Today's Target</h2>
+            <p id="todayTarget">No target set</p>
+        </div>
+
+        <!-- What to Learn Today -->
+        <div class="card">
+            <h2>📚 What I Have to Learn Today</h2>
+            <ul id="todayTasks">
+                <li>No tasks added</li>
+            </ul>
+        </div>
+
+    </div>
+
+    <!-- Common JavaScript -->
+    <script src="script.js"></script>
+    <script>
+        // Load dashboard data when page loads
+        loadHomePage();
+    </script>
+
+</body>
+</html>

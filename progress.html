@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Progress | Study Tracker</title>
+
+    <!-- Common CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="progress.html">Progress</a>
+        <a href="today.html">Today</a>
+        <a href="ideal.html">Ideal</a>
+        <a href="analysis.html">Analysis</a>
+        <a href="forecast.html">Forecast</a>
+    </nav>
+
+    <hr>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <h1>Overall Learning Progress</h1>
+        <p>This page shows how much you have learned till now</p>
+
+        <!-- Overall Summary -->
+        <div class="card">
+            <h2>📊 Overall Summary</h2>
+            <p><strong>Total Study Done:</strong> <span id="totalStudy">0</span></p>
+            <p><strong>Total Target Till Now:</strong> <span id="totalTarget">0</span></p>
+            <p><strong>Overall Completion:</strong> <span id="overallCompletion">0%</span></p>
+        </div>
+
+        <!-- Subject-wise Progress -->
+        <div class="card">
+            <h2>📚 Subject-wise Progress</h2>
+            <div id="subjectProgress">
+                <p>No data available</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Common JavaScript -->
+    <script src="script.js"></script>
+    <script>
+        // Load overall progress data
+        loadProgressPage();
+    </script>
+
+</body>
+</html>

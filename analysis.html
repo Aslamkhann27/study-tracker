@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Analysis | Study Tracker</title>
+
+    <!-- Common CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="progress.html">Progress</a>
+        <a href="today.html">Today</a>
+        <a href="ideal.html">Ideal</a>
+        <a href="analysis.html">Analysis</a>
+        <a href="forecast.html">Forecast</a>
+    </nav>
+
+    <hr>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <h1>Profile Analysis</h1>
+        <p>Deep analysis of your learning behavior</p>
+
+        <!-- Overall Performance -->
+        <div class="card">
+            <h2>📊 Overall Performance</h2>
+            <p><strong>Total Study Done:</strong> <span id="analysisTotalStudy">0</span></p>
+            <p><strong>Total Target:</strong> <span id="analysisTotalTarget">0</span></p>
+            <p><strong>Overall Completion:</strong> <span id="analysisCompletion">0%</span></p>
+        </div>
+
+        <!-- Consistency Analysis -->
+        <div class="card">
+            <h2>🔥 Consistency Analysis</h2>
+            <p><strong>Current Streak:</strong> <span id="analysisStreak">0</span> days</p>
+            <p><strong>Average Daily Study:</strong> <span id="analysisAverage">0</span></p>
+        </div>
+
+        <!-- Strengths and Weaknesses -->
+        <div class="card">
+            <h2>⚖ Strengths & Weaknesses</h2>
+            <p><strong>Strongest Subject:</strong> <span id="strongestSubject">-</span></p>
+            <p><strong>Weakest Subject:</strong> <span id="weakestSubject">-</span></p>
+        </div>
+
+        <!-- Reflection -->
+        <div class="card">
+            <h2>🧠 Reflection</h2>
+            <p id="reflectionText">No analysis available</p>
+        </div>
+
+    </div>
+
+    <!-- Common JavaScript -->
+    <script src="script.js"></script>
+    <script>
+        // Load analysis data
+        loadAnalysisPage();
+    </script>
+
+</body>
+</html>
