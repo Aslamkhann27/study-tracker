@@ -1,6 +1,6 @@
-/*********************************************************
-  INITIAL SETUP – CREATE DATA IF NOT EXISTS
-*********************************************************/
+/* ---------------------------------------------------------
+   INITIAL SETUP
+--------------------------------------------------------- */
 
 if (!localStorage.getItem("studyData")) {
     localStorage.setItem("studyData", JSON.stringify({
@@ -22,26 +22,31 @@ function getToday() {
     return new Date().toDateString();
 }
 
-/*********************************************************
-  TODAY PAGE LOGIC (INPUT PAGE)
-*********************************************************/
+function getOrCreateSubject(data, subject) {
+    if (!data.subjects[subject]) {
+        data.subjects[subject] = { history: {}, targets: {} };
+    }
+    return data.subjects[subject];
+}
+
+/* ---------------------------------------------------------
+   TODAY PAGE
+--------------------------------------------------------- */
 
 function loadTodayPage() {
     const data = getData();
     const subjectSelect = document.getElementById("subjectSelect");
     subjectSelect.innerHTML = "";
 
-    // Load subjects
-    for (let subject in data.subjects) {
-        let option = document.createElement("option");
+    for (const subject of Object.keys(data.subjects).sort((a, b) => a.localeCompare(b))) {
+        const option = document.createElement("option");
         option.value = subject;
         option.textContent = subject;
         subjectSelect.appendChild(option);
     }
 
-    // If no subject exists, create one example
     if (subjectSelect.options.length === 0) {
-        data.subjects["General Study"] = { history: {}, targets: {} };
+        getOrCreateSubject(data, "General Study");
         saveData(data);
         loadTodayPage();
         return;
@@ -50,63 +55,107 @@ function loadTodayPage() {
     loadTodaySummary();
 }
 
+function addSubject() {
+    const input = document.getElementById("newSubjectName");
+    const message = document.getElementById("subjectMessage");
+    const subject = input.value.trim();
+
+    if (!subject) {
+        message.textContent = "Enter a subject name first.";
+        return;
+    }
+
+    const data = getData();
+    const existingSubject = Object.keys(data.subjects).find(
+        name => name.toLocaleLowerCase() === subject.toLocaleLowerCase()
+    );
+
+    if (existingSubject) {
+        message.textContent = "That subject is already in your list.";
+        return;
+    }
+
+    getOrCreateSubject(data, subject);
+    saveData(data);
+
+    loadTodayPage();
+    document.getElementById("subjectSelect").value = subject;
+    loadTodaySummary();
+
+    input.value = "";
+    message.textContent = subject + " added successfully.";
+}
+
 function saveTodayData() {
     const data = getData();
     const subject = document.getElementById("subjectSelect").value;
-    const target = Number(document.getElementById("todayTarget").value);
-    const actual = Number(document.getElementById("actualStudy").value);
-    const today = getToday();
+    const targetInput = document.getElementById("todayTarget");
+    const actualInput = document.getElementById("actualStudy");
+    const target = Number(targetInput.value);
+    const actual = Number(actualInput.value);
+    const message = document.getElementById("saveMessage");
 
-    if (!data.subjects[subject]) {
-        data.subjects[subject] = { history: {}, targets: {} };
+    if (!subject) {
+        message.textContent = "Add or select a subject before saving.";
+        return;
     }
 
-    data.subjects[subject].targets[today] = target;
-    data.subjects[subject].history[today] = actual;
+    if (targetInput.value.trim() === "" || !Number.isFinite(target) || target <= 0) {
+        message.textContent = "Enter a target greater than zero.";
+        targetInput.focus();
+        return;
+    }
 
-    // STREAK LOGIC
+    if (actualInput.value.trim() === "" || !Number.isFinite(actual) || actual < 0) {
+        message.textContent = "Enter a valid study amount (zero or more).";
+        actualInput.focus();
+        return;
+    }
+
+    const today = getToday();
+    const subjectData = getOrCreateSubject(data, subject);
+    subjectData.targets[today] = target;
+    subjectData.history[today] = actual;
+
+    // Update the streak at most once per calendar day.
     if (data.lastDate !== today) {
-        if (actual >= 0.8 * target) {
-            data.streak += 1;
-        } else {
-            data.streak = 0;
-        }
+        data.streak = actual >= 0.8 * target ? data.streak + 1 : 0;
         data.lastDate = today;
     }
 
     saveData(data);
     loadTodaySummary();
+    message.textContent = "Today's study data saved.";
 }
 
 function loadTodaySummary() {
     const data = getData();
     const today = getToday();
-    const subject = document.getElementById("subjectSelect").value;
-
-    const target = data.subjects[subject]?.targets[today] || 0;
-    const actual = data.subjects[subject]?.history[today] || 0;
-    const completion = target ? ((actual / target) * 100).toFixed(1) : 0;
+    const subjectSelect = document.getElementById("subjectSelect");
+    const subject = subjectSelect.value;
+    const target = data.subjects[subject]?.targets[today] ?? 0;
+    const actual = data.subjects[subject]?.history[today] ?? 0;
+    const completion = target > 0 ? ((actual / target) * 100).toFixed(1) : "0.0";
     const difference = target - actual;
 
     document.getElementById("summaryTarget").textContent = target;
     document.getElementById("summaryActual").textContent = actual;
     document.getElementById("summaryCompletion").textContent = completion + "%";
-    document.getElementById("summaryDifference").textContent = difference;
+    document.getElementById("summaryDifference").textContent = difference.toFixed(2);
 }
 
-/*********************************************************
-  HOME PAGE LOGIC
-*********************************************************/
+/* ---------------------------------------------------------
+   HOME PAGE
+--------------------------------------------------------- */
 
 function loadHomePage() {
     const data = getData();
     const today = getToday();
-
     let todayTarget = 0;
-    let tasks = [];
+    const tasks = [];
 
-    for (let subject in data.subjects) {
-        let target = data.subjects[subject].targets[today];
+    for (const subject in data.subjects) {
+        const target = data.subjects[subject].targets[today];
         if (target) {
             todayTarget += target;
             tasks.push(subject + " (" + target + ")");
@@ -114,41 +163,42 @@ function loadHomePage() {
     }
 
     document.getElementById("streakValue").textContent = data.streak + " days";
-    document.getElementById("todayTarget").textContent =
-        todayTarget ? todayTarget : "No target set";
+    document.getElementById("todayTarget").textContent = todayTarget || "No target set";
 
     const list = document.getElementById("todayTasks");
     list.innerHTML = "";
 
     if (tasks.length === 0) {
-        list.innerHTML = "<li>No tasks added</li>";
-    } else {
-        tasks.forEach(task => {
-            let li = document.createElement("li");
-            li.textContent = task;
-            list.appendChild(li);
-        });
+        const item = document.createElement("li");
+        item.textContent = "No tasks added";
+        list.appendChild(item);
+        return;
     }
+
+    tasks.forEach(task => {
+        const item = document.createElement("li");
+        item.textContent = task;
+        list.appendChild(item);
+    });
 }
 
-/*********************************************************
-  PROGRESS PAGE LOGIC
-*********************************************************/
+/* ---------------------------------------------------------
+   PROGRESS PAGE
+--------------------------------------------------------- */
 
 function loadProgressPage() {
     const data = getData();
-
     let totalStudy = 0;
     let totalTarget = 0;
 
     const subjectDiv = document.getElementById("subjectProgress");
     subjectDiv.innerHTML = "";
 
-    for (let subject in data.subjects) {
+    for (const subject in data.subjects) {
         let subStudy = 0;
         let subTarget = 0;
 
-        for (let day in data.subjects[subject].history) {
+        for (const day in data.subjects[subject].history) {
             subStudy += data.subjects[subject].history[day];
             subTarget += data.subjects[subject].targets[day] || 0;
         }
@@ -156,11 +206,12 @@ function loadProgressPage() {
         totalStudy += subStudy;
         totalTarget += subTarget;
 
-        let percent = subTarget ? ((subStudy / subTarget) * 100).toFixed(1) : 0;
-
-        subjectDiv.innerHTML += `
-            <p><strong>${subject}:</strong> ${subStudy} / ${subTarget} (${percent}%)</p>
-        `;
+        const percent = subTarget ? ((subStudy / subTarget) * 100).toFixed(1) : "0.0";
+        const row = document.createElement("p");
+        const label = document.createElement("strong");
+        label.textContent = subject + ": ";
+        row.append(label, document.createTextNode(subStudy + " / " + subTarget + " (" + percent + "%)"));
+        subjectDiv.appendChild(row);
     }
 
     document.getElementById("totalStudy").textContent = totalStudy;
@@ -169,21 +220,20 @@ function loadProgressPage() {
         totalTarget ? ((totalStudy / totalTarget) * 100).toFixed(1) + "%" : "0%";
 }
 
-/*********************************************************
-  IDEAL STUDENT PAGE LOGIC
-*********************************************************/
+/* ---------------------------------------------------------
+   IDEAL STUDENT PAGE
+--------------------------------------------------------- */
 
 function loadIdealPage() {
     const data = getData();
     const today = getToday();
-
     let yourToday = 0;
     let idealToday = 0;
     let yourTotal = 0;
     let idealTotal = 0;
 
-    for (let subject in data.subjects) {
-        for (let day in data.subjects[subject].targets) {
+    for (const subject in data.subjects) {
+        for (const day in data.subjects[subject].targets) {
             idealTotal += data.subjects[subject].targets[day];
             yourTotal += data.subjects[subject].history[day] || 0;
         }
@@ -195,49 +245,48 @@ function loadIdealPage() {
     document.getElementById("idealToday").textContent = idealToday;
     document.getElementById("yourToday").textContent = yourToday;
     document.getElementById("todayGap").textContent = idealToday - yourToday;
-
     document.getElementById("idealTotal").textContent = idealTotal;
     document.getElementById("yourTotal").textContent = yourTotal;
     document.getElementById("totalGap").textContent = idealTotal - yourTotal;
-
     document.getElementById("interpretationText").textContent =
         yourTotal >= idealTotal
             ? "You are matching or exceeding the ideal learning pace."
             : "You are behind the ideal learning pace. Improve consistency.";
 }
 
-/*********************************************************
-  ANALYSIS PAGE LOGIC
-*********************************************************/
+/* ---------------------------------------------------------
+   ANALYSIS PAGE
+--------------------------------------------------------- */
 
 function loadAnalysisPage() {
     const data = getData();
-
     let totalStudy = 0;
     let totalTarget = 0;
-    let subjectTotals = {};
+    const subjectTotals = {};
 
-    for (let subject in data.subjects) {
+    for (const subject in data.subjects) {
         subjectTotals[subject] = 0;
-        for (let day in data.subjects[subject].history) {
-            totalStudy += data.subjects[subject].history[day];
-            subjectTotals[subject] += data.subjects[subject].history[day];
+        for (const day in data.subjects[subject].history) {
+            const studied = data.subjects[subject].history[day] || 0;
+            totalStudy += studied;
+            subjectTotals[subject] += studied;
             totalTarget += data.subjects[subject].targets[day] || 0;
         }
     }
 
     let strongest = "-";
     let weakest = "-";
-    let max = -1, min = Infinity;
+    let max = -1;
+    let min = Infinity;
 
-    for (let s in subjectTotals) {
-        if (subjectTotals[s] > max) {
-            max = subjectTotals[s];
-            strongest = s;
+    for (const subject in subjectTotals) {
+        if (subjectTotals[subject] > max) {
+            max = subjectTotals[subject];
+            strongest = subject;
         }
-        if (subjectTotals[s] < min) {
-            min = subjectTotals[s];
-            weakest = s;
+        if (subjectTotals[subject] < min) {
+            min = subjectTotals[subject];
+            weakest = subject;
         }
     }
 
@@ -245,47 +294,44 @@ function loadAnalysisPage() {
     document.getElementById("analysisTotalTarget").textContent = totalTarget;
     document.getElementById("analysisCompletion").textContent =
         totalTarget ? ((totalStudy / totalTarget) * 100).toFixed(1) + "%" : "0%";
-
     document.getElementById("analysisStreak").textContent = data.streak;
 
-    const daysTracked = Object.values(data.subjects)[0]
-        ? Object.keys(Object.values(data.subjects)[0].history).length
-        : 0;
+    const daysTracked = new Set();
+    for (const subject in data.subjects) {
+        Object.keys(data.subjects[subject].history).forEach(day => daysTracked.add(day));
+    }
 
     document.getElementById("analysisAverage").textContent =
-        daysTracked ? (totalStudy / daysTracked).toFixed(2) : 0;
-
+        daysTracked.size ? (totalStudy / daysTracked.size).toFixed(2) : "0";
     document.getElementById("strongestSubject").textContent = strongest;
     document.getElementById("weakestSubject").textContent = weakest;
-
     document.getElementById("reflectionText").textContent =
         data.streak >= 3
             ? "You show good consistency. Keep maintaining your streak."
             : "Your consistency needs improvement. Try to meet daily targets.";
 }
 
-/*********************************************************
-  FORECAST PAGE LOGIC
-*********************************************************/
+/* ---------------------------------------------------------
+   FORECAST PAGE
+--------------------------------------------------------- */
 
 function loadForecastPage() {
     const data = getData();
-
     let totalStudy = 0;
     let totalTarget = 0;
-    let allDays = new Set();
+    const allDays = new Set();
 
-    for (let subject in data.subjects) {
-        for (let day in data.subjects[subject].history) {
+    for (const subject in data.subjects) {
+        for (const day in data.subjects[subject].history) {
             totalStudy += data.subjects[subject].history[day];
             totalTarget += data.subjects[subject].targets[day] || 0;
             allDays.add(day);
         }
     }
 
-    let remaining = totalTarget - totalStudy;
-    let average = allDays.size ? (totalStudy / allDays.size) : 0;
-    let daysNeeded = average ? Math.ceil(remaining / average) : 0;
+    const remaining = totalTarget - totalStudy;
+    const average = allDays.size ? totalStudy / allDays.size : 0;
+    const daysNeeded = average > 0 ? Math.ceil(remaining / average) : 0;
 
     document.getElementById("completedStudy").textContent = totalStudy;
     document.getElementById("requiredStudy").textContent = totalTarget;
@@ -295,4 +341,3 @@ function loadForecastPage() {
     document.getElementById("estimatedDays").textContent =
         daysNeeded > 0 ? daysNeeded + " days" : "Not enough data";
 }
-/********************************************************/

@@ -2,14 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Today | Study Tracker</title>
-
-    <!-- Common CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- Navigation Bar -->
     <nav>
         <a href="index.html">Home</a>
         <a href="progress.html">Progress</a>
@@ -21,42 +19,43 @@
 
     <hr>
 
-    <!-- Main Container -->
     <div class="container">
 
         <h1>Today's Learning</h1>
         <p>Plan and record what you study today</p>
 
-        <!-- Select Subject -->
         <div class="card">
             <h2>📚 Subject Selection</h2>
-
             <label for="subjectSelect">Select Subject</label>
-            <select id="subjectSelect"></select>
+            <select id="subjectSelect" onchange="loadTodaySummary()"></select>
         </div>
 
-        <!-- Target Setting -->
+        <div class="card">
+            <h2>➕ Add a Subject</h2>
+            <p>Add a subject to your personal study list.</p>
+            <label for="newSubjectName">Subject name</label>
+            <input type="text" id="newSubjectName" maxlength="40" placeholder="e.g. Computer Networks">
+            <button type="button" onclick="addSubject()">Add Subject</button>
+            <p id="subjectMessage" role="status" aria-live="polite"></p>
+        </div>
+
         <div class="card">
             <h2>🎯 Today's Target</h2>
-
             <label for="todayTarget">Target for Today (hours / units)</label>
-            <input type="number" id="todayTarget" placeholder="Enter today's target">
+            <input type="number" id="todayTarget" min="0" step="0.25" placeholder="Enter today's target">
         </div>
 
-        <!-- Actual Study -->
         <div class="card">
             <h2>✍️ Actual Study Done</h2>
-
             <label for="actualStudy">Actual Study Completed Today</label>
-            <input type="number" id="actualStudy" placeholder="Enter actual study done">
+            <input type="number" id="actualStudy" min="0" step="0.25" placeholder="Enter actual study done">
         </div>
 
-        <!-- Save Button -->
         <div class="card">
-            <button onclick="saveTodayData()">Save Today's Data</button>
+            <button type="button" onclick="saveTodayData()">Save Today's Data</button>
+            <p id="saveMessage" role="status" aria-live="polite"></p>
         </div>
 
-        <!-- Daily Summary -->
         <div class="card">
             <h2>📊 Today's Summary</h2>
             <p><strong>Target:</strong> <span id="summaryTarget">0</span></p>
@@ -67,10 +66,8 @@
 
     </div>
 
-    <!-- Common JavaScript -->
     <script src="script.js"></script>
     <script>
-        // Load subjects and today's data when page loads
         loadTodayPage();
     </script>
 
