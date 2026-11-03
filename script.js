@@ -144,6 +144,7 @@ function mountAccountUI() {
         } catch (error) { showStatus("authMessage", error.message, true); }
         finally { submit.disabled = false; }
     });
+    setMode("login");
     updateAccountUI();
 }
 function updateAccountUI() {
@@ -245,7 +246,7 @@ async function loadTodaySummary() {
         const subjects = await apiList("/subjects/");
         const subject = subjects.find(item => item.name === name);
         const entries = subject ? await apiList("/entries/?study_date=" + todayISO()) : [];
-        const entry = entries.find(item => item.subject === subject?.id);
+        const entry = entries.find(item => item.subject === subject?.id && item.study_date === todayISO());
         const target = Number(entry?.target_hours || 0), actual = Number(entry?.actual_hours || 0);
         document.getElementById("summaryTarget").textContent = target;
         document.getElementById("summaryActual").textContent = actual;
