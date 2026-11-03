@@ -11,6 +11,7 @@ Requests and responses use JSON. Protected endpoints require `Authorization: Bea
 | POST | `/auth/register/` | Public | Create account |
 | POST | `/auth/token/` | Public | Obtain JWT pair |
 | POST | `/auth/token/refresh/` | Public | Refresh access token |
+| POST | `/auth/logout/` | Authenticated | Blacklist a refresh token |
 
 ### Register
 `POST /auth/register/`
@@ -38,6 +39,15 @@ Returns `access` and `refresh` JWTs. Access lifetime is 30 minutes and refresh l
 ```
 
 Refresh-token rotation is enabled.
+
+### Logout
+`POST /auth/logout/`
+
+```json
+{ "refresh": "<refresh-token>" }
+```
+
+The authenticated refresh token is blacklisted and can no longer be used.
 
 ## Authenticated resources
 

@@ -108,6 +108,16 @@ button:hover {
     background-color: #1d4ed8;
 }
 
+#statusMessage {
+    min-height: 1.5em;
+    color: #b91c1c;
+    font-weight: bold;
+}
+
+#statusMessage[data-type="success"] {
+    color: #166534;
+}
+
 /* -------------------------
    LIST STYLES
 -------------------------- */

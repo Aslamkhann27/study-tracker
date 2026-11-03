@@ -75,4 +75,7 @@ Open `http://localhost:5500`. For local testing, configure `window.STUDY_API_BAS
 - The current frontend stores JWT tokens in browser local storage.
 
 ## Validation
-Backend CI runs Django checks and the configured test suite. A successful deployment confirms the service starts, but browser-based registration/login and subject/study-entry CRUD smoke tests should also be completed before treating a release as fully verified.
+Frontend CI runs the Node-based smoke test, while backend CI runs Django checks,
+migration checks, and the API test suite. A successful deployment confirms the
+service starts, but browser-based registration/login and subject/study-entry CRUD
+smoke tests should also be completed before treating a release as fully verified.

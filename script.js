@@ -2,6 +2,7 @@
 const API_BASE = (window.STUDY_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 const ACCESS_KEY = "studyAccessToken";
 const REFRESH_KEY = "studyRefreshToken";
+let refreshInFlight = null;
 
 function getAccessToken() { return localStorage.getItem(ACCESS_KEY); }
 function setTokens(data) {
@@ -13,19 +14,46 @@ function clearTokens() {
     localStorage.removeItem(REFRESH_KEY);
 }
 async function refreshAccessToken() {
+    if (refreshInFlight) return refreshInFlight;
     const refresh = localStorage.getItem(REFRESH_KEY);
     if (!refresh) return false;
-    try {
-        const response = await fetch(API_BASE + "/auth/token/refresh/", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refresh })
-        });
-        if (!response.ok) throw new Error("Session expired");
-        const data = await response.json();
-        localStorage.setItem(ACCESS_KEY, data.access);
-        if (data.refresh) localStorage.setItem(REFRESH_KEY, data.refresh);
-        return true;
-    } catch (_) { clearTokens(); return false; }
+    refreshInFlight = (async () => {
+        try {
+            const response = await fetch(API_BASE + "/auth/token/refresh/", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ refresh })
+            });
+            if (!response.ok) throw new Error("Session expired");
+            const data = await response.json();
+            localStorage.setItem(ACCESS_KEY, data.access);
+            if (data.refresh) localStorage.setItem(REFRESH_KEY, data.refresh);
+            return true;
+        } catch (_) {
+            clearTokens();
+            return false;
+        } finally {
+            refreshInFlight = null;
+        }
+    })();
+    return refreshInFlight;
+}
+async function logout() {
+    const refresh = localStorage.getItem(REFRESH_KEY);
+    if (refresh) {
+        try {
+            await fetch(API_BASE + "/auth/logout/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(getAccessToken() ? { Authorization: "Bearer " + getAccessToken() } : {}) },
+                body: JSON.stringify({ refresh }),
+                keepalive: true
+            });
+        } catch (_) {
+            // Local token removal still prevents this browser from using the session.
+        }
+    }
+    clearTokens();
+    updateAccountUI();
+    location.reload();
 }
 async function api(path, options = {}, retry = true) {
     const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
@@ -117,9 +145,7 @@ function mountAccountUI() {
     document.getElementById("showLogin").onclick = () => setMode("login");
     document.getElementById("showRegister").onclick = () => setMode("register");
     document.getElementById("authCancel").onclick = () => { form.hidden = true; };
-    document.getElementById("logoutButton").onclick = () => {
-        clearTokens(); updateAccountUI(); location.reload();
-    };
+    document.getElementById("logoutButton").onclick = logout;
     form.addEventListener("submit", async event => {
         event.preventDefault();
         const username = document.getElementById("authUsername").value.trim();
@@ -361,3 +387,7 @@ document.addEventListener("DOMContentLoaded", () => {
     mountAccountUI();
     loadCurrentPage();
 });
+
+if (typeof window !== "undefined") {
+    window.studyTracker = { displayDate, todayISO };
+}

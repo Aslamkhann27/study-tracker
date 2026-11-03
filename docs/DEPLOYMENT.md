@@ -35,6 +35,8 @@ Configure these variables in the Render dashboard. Do not put secret values in G
 | `DEBUG` | `False` in production |
 | `ALLOWED_HOSTS` | Include the Render hostname |
 | `CORS_ALLOWED_ORIGINS` | Exact deployed frontend origin |
+| `CSRF_TRUSTED_ORIGINS` | Exact HTTPS origins allowed for Django CSRF checks |
+| `SECURE_SSL_REDIRECT` | `True` in production |
 | `DATABASE_URL` | Neon PostgreSQL connection URL |
 
 The application falls back to SQLite only when `DATABASE_URL` is absent. Production should use Neon. Render runs migrations during each build before starting Gunicorn.
@@ -64,5 +66,9 @@ For local development, run Django from `backend` with `python manage.py runserve
 5. Verify `/api/health/` returns healthy status.
 6. In a browser, test registration, login, token refresh, subject CRUD and study-entry CRUD.
 7. Verify data persists after refresh and is isolated between two test accounts.
+
+Production settings reject a missing `SECRET_KEY` when `DEBUG=False`, enable
+secure cookie and HSTS defaults, and blacklist refresh tokens on logout and
+rotation.
 
 A live service/deploy does not alone prove all browser flows. Perform the browser smoke tests before declaring a release fully validated.

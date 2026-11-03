@@ -28,6 +28,27 @@ class StudyTrackerApiTests(APITestCase):
         }, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_entry_rejects_negative_hours(self):
+        subject = Subject.objects.create(user=self.user, name="OS")
+        response = self.client.post("/api/entries/", {
+            "subject": subject.id,
+            "study_date": date.today().isoformat(),
+            "target_hours": "-1.00",
+            "actual_hours": "1.50"
+        }, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_logout_blacklists_refresh_token(self):
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        refresh = str(RefreshToken.for_user(self.user))
+        response = self.client.post("/api/auth/logout/", {"refresh": refresh}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        refresh_response = self.client.post(
+            "/api/auth/token/refresh/", {"refresh": refresh}, format="json"
+        )
+        self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
     def test_users_cannot_access_or_use_another_users_data(self):
         other = get_user_model().objects.create_user(username="other", password="StrongPass123!")
         other_subject = Subject.objects.create(user=other, name="Private")
