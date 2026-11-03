@@ -264,7 +264,7 @@ async function loadHomePage() {
         document.getElementById("todayTarget").textContent = dashboard.today.target_hours || "No target set";
         const list = document.getElementById("todayTasks");
         list.innerHTML = "";
-        const entries = await apiList("/entries/?study_date=" + todayISO());
+        const entries = (await apiList("/entries/")).filter(entry => entry.study_date === todayISO());
         const subjects = dashboard.subjects || [];
         entries.forEach(entry => {
             const subject = subjects.find(item => item.id === entry.subject);
