@@ -17,8 +17,6 @@ jobs:
         env:
           HEALTH_URL: ${{ vars.RENDER_HEALTH_URL }}
         run: |
-          if [ -z "$HEALTH_URL" ]; then
-            echo "Set Actions variable RENDER_HEALTH_URL to https://YOUR-SERVICE.onrender.com/api/health/"
-            exit 1
-          fi
+          HEALTH_URL="${HEALTH_URL:-https://study-tracker-backend-lt40.onrender.com/api/health/}"
+          echo "Checking ${HEALTH_URL}"
           curl --fail --silent --show-error --max-time 20 "$HEALTH_URL"
