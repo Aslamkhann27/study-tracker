@@ -1,6 +1,6 @@
 # Study Tracker API (Django)
 
-This backend is added alongside the existing plain HTML/CSS/JavaScript frontend. The current frontend is intentionally unchanged; connect it to these APIs in a follow-up integration step.
+This backend is added alongside the existing plain HTML/CSS/JavaScript frontend. The frontend now includes login/registration and reads and writes study data through this API. It remains plain HTML/CSS/JavaScript.
 
 ## Local setup
 
@@ -20,7 +20,7 @@ python manage.py runserver
 
 On macOS/Linux, activate with `source .venv/bin/activate` and copy the env file with `cp .env.example .env`.
 
-API base URL: `http://127.0.0.1:8000/api/`
+API base URL: `http://127.0.0.1:8000/api/`. The frontend reads this from the root `api-config.js` file. Change `window.STUDY_API_BASE_URL` there to your deployed API URL before publishing the frontend.
 
 ## Endpoints
 
