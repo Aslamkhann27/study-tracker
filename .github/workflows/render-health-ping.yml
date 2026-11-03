@@ -1,0 +1,24 @@
+name: Render health ping
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check Render API health
+        env:
+          HEALTH_URL: ${{ vars.RENDER_HEALTH_URL }}
+        run: |
+          if [ -z "$HEALTH_URL" ]; then
+            echo "Set Actions variable RENDER_HEALTH_URL to https://YOUR-SERVICE.onrender.com/api/health/"
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 20 "$HEALTH_URL"
