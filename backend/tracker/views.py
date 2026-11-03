@@ -1,5 +1,6 @@
 from datetime import timedelta
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import generics, viewsets
@@ -60,3 +61,16 @@ def dashboard(request):
         "all_time": {"target_hours": totals["target"] or 0, "actual_hours": totals["studied"] or 0},
         "subjects": SubjectSerializer(Subject.objects.filter(user=request.user), many=True).data,
     })
+
+
+@api_view(["GET", "HEAD"])
+@permission_classes([AllowAny])
+def health(request):
+    """Public health endpoint that verifies database connectivity."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except Exception:
+        return Response({"status": "unhealthy", "database": "unavailable"}, status=503)
+    return Response({"status": "ok", "database": "ok"})
