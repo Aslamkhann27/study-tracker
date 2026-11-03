@@ -39,6 +39,11 @@ Configure these variables in the Render dashboard. Do not put secret values in G
 | `SECURE_SSL_REDIRECT` | `True` in production |
 | `DATABASE_URL` | Neon PostgreSQL connection URL |
 
+The scheduled Render health-ping workflow accepts the optional repository
+Actions variable `RENDER_HEALTH_URL`. When it is not configured, it safely
+checks the public production endpoint
+`https://study-tracker-backend-lt40.onrender.com/api/health/`.
+
 The application falls back to SQLite only when `DATABASE_URL` is absent. Production should use Neon. Render runs migrations during each build before starting Gunicorn.
 
 ## Neon
