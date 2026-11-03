@@ -227,7 +227,7 @@ async function saveTodayData() {
         if (!subject) throw new Error("Selected subject was not found. Refresh and try again.");
         const today = todayISO();
         const entries = await apiList("/entries/?study_date=" + today);
-        const existing = entries.find(entry => entry.subject === subject.id);
+        const existing = entries.find(entry => entry.subject === subject.id && entry.study_date === today);
         const payload = { subject: subject.id, study_date: today, target_hours: target, actual_hours: actual };
         await api(existing ? "/entries/" + existing.id + "/" : "/entries/", {
             method: existing ? "PATCH" : "POST", body: JSON.stringify(payload)
