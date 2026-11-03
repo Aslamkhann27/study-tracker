@@ -1,0 +1,9 @@
+{
+  "name": "study-tracker",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test",
+    "test:frontend": "node --test tests/frontend.test.js"
+  }
+}

@@ -40,7 +40,7 @@
             <h2>🎯 Today's Target</h2>
 
             <label for="todayTarget">Target for Today (hours / units)</label>
-            <input type="number" id="todayTarget" placeholder="Enter today's target">
+            <input type="number" id="todayTarget" min="0" step="any" placeholder="Enter today's target">
         </div>
 
         <!-- Actual Study -->
@@ -48,7 +48,7 @@
             <h2>✍️ Actual Study Done</h2>
 
             <label for="actualStudy">Actual Study Completed Today</label>
-            <input type="number" id="actualStudy" placeholder="Enter actual study done">
+            <input type="number" id="actualStudy" min="0" step="any" placeholder="Enter actual study done">
         </div>
 
         <!-- Save Button -->
@@ -64,6 +64,8 @@
             <p><strong>Completion:</strong> <span id="summaryCompletion">0%</span></p>
             <p><strong>Difference:</strong> <span id="summaryDifference">0</span></p>
         </div>
+
+        <p id="statusMessage" role="status" aria-live="polite"></p>
 
     </div>
 

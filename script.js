@@ -1,62 +1,181 @@
-/*********************************************************
-  INITIAL SETUP – CREATE DATA IF NOT EXISTS
-*********************************************************/
+const STORAGE_KEY = "studyData";
 
-if (!localStorage.getItem("studyData")) {
-    localStorage.setItem("studyData", JSON.stringify({
+function createDefaultData() {
+    return {
         subjects: {},
         streak: 0,
         lastDate: null
-    }));
+    };
+}
+
+function isRecord(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function normaliseEntries(value) {
+    if (!isRecord(value)) {
+        return {};
+    }
+
+    return Object.fromEntries(
+        Object.entries(value)
+            .filter(([key, amount]) =>
+                key.trim().length > 0 &&
+                Number.isFinite(amount) &&
+                amount >= 0
+            )
+            .map(([key, amount]) => [key.trim().slice(0, 100), amount])
+    );
+}
+
+function sanitiseData(value) {
+    const data = createDefaultData();
+
+    if (!isRecord(value)) {
+        return data;
+    }
+
+    if (isRecord(value.subjects)) {
+        for (const [subjectName, subjectValue] of Object.entries(value.subjects)) {
+            const subject = subjectName.trim().slice(0, 100);
+            if (!subject || !isRecord(subjectValue)) {
+                continue;
+            }
+
+            data.subjects[subject] = {
+                history: normaliseEntries(subjectValue.history),
+                targets: normaliseEntries(subjectValue.targets)
+            };
+        }
+    }
+
+    if (Number.isFinite(value.streak) && value.streak >= 0) {
+        data.streak = Math.floor(value.streak);
+    }
+
+    if (typeof value.lastDate === "string" && value.lastDate.length <= 100) {
+        data.lastDate = value.lastDate;
+    }
+
+    return data;
+}
+
+function getElement(id) {
+    return typeof document === "undefined" ? null : document.getElementById(id);
+}
+
+function setStatus(message, type = "error") {
+    const status = getElement("statusMessage");
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message;
+    status.dataset.type = type;
 }
 
 function getData() {
-    return JSON.parse(localStorage.getItem("studyData"));
+    if (typeof localStorage === "undefined") {
+        return createDefaultData();
+    }
+
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        const data = sanitiseData(stored ? JSON.parse(stored) : null);
+        if (!stored) {
+            saveData(data);
+        }
+        return data;
+    } catch (error) {
+        setStatus("Saved study data could not be read. A new empty plan is being used.");
+        return createDefaultData();
+    }
 }
 
 function saveData(data) {
-    localStorage.setItem("studyData", JSON.stringify(data));
+    if (typeof localStorage === "undefined") {
+        return false;
+    }
+
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitiseData(data)));
+        return true;
+    } catch (error) {
+        setStatus("Study data could not be saved. Check available browser storage.");
+        return false;
+    }
 }
 
 function getToday() {
     return new Date().toDateString();
 }
 
-/*********************************************************
-  TODAY PAGE LOGIC (INPUT PAGE)
-*********************************************************/
+function getSubjectEntries(data) {
+    return Object.entries(data.subjects);
+}
+
+function calculateTotals(data) {
+    let totalStudy = 0;
+    let totalTarget = 0;
+    const allDays = new Set();
+    const subjectTotals = {};
+
+    for (const [subject, values] of getSubjectEntries(data)) {
+        subjectTotals[subject] = 0;
+        for (const [day, amount] of Object.entries(values.history)) {
+            totalStudy += amount;
+            subjectTotals[subject] += amount;
+            totalTarget += values.targets[day] || 0;
+            allDays.add(day);
+        }
+    }
+
+    return { totalStudy, totalTarget, allDays, subjectTotals };
+}
 
 function loadTodayPage() {
-    const data = getData();
-    const subjectSelect = document.getElementById("subjectSelect");
-    subjectSelect.innerHTML = "";
+    const subjectSelect = getElement("subjectSelect");
+    if (!subjectSelect) {
+        return;
+    }
 
-    // Load subjects
-    for (let subject in data.subjects) {
-        let option = document.createElement("option");
+    const data = getData();
+    if (Object.keys(data.subjects).length === 0) {
+        data.subjects["General Study"] = { history: {}, targets: {} };
+        saveData(data);
+    }
+
+    subjectSelect.replaceChildren();
+    for (const subject of Object.keys(data.subjects)) {
+        const option = document.createElement("option");
         option.value = subject;
         option.textContent = subject;
         subjectSelect.appendChild(option);
-    }
-
-    // If no subject exists, create one example
-    if (subjectSelect.options.length === 0) {
-        data.subjects["General Study"] = { history: {}, targets: {} };
-        saveData(data);
-        loadTodayPage();
-        return;
     }
 
     loadTodaySummary();
 }
 
 function saveTodayData() {
-    const data = getData();
-    const subject = document.getElementById("subjectSelect").value;
-    const target = Number(document.getElementById("todayTarget").value);
-    const actual = Number(document.getElementById("actualStudy").value);
-    const today = getToday();
+    const subjectSelect = getElement("subjectSelect");
+    const targetInput = getElement("todayTarget");
+    const actualInput = getElement("actualStudy");
+    if (!subjectSelect || !targetInput || !actualInput) {
+        return false;
+    }
 
+    const subject = subjectSelect.value.trim();
+    const target = Number(targetInput.value);
+    const actual = Number(actualInput.value);
+
+    if (!subject || !Number.isFinite(target) || target < 0 ||
+        !Number.isFinite(actual) || actual < 0) {
+        setStatus("Enter non-negative numbers for both target and actual study.");
+        return false;
+    }
+
+    const data = getData();
+    const today = getToday();
     if (!data.subjects[subject]) {
         data.subjects[subject] = { history: {}, targets: {} };
     }
@@ -64,235 +183,218 @@ function saveTodayData() {
     data.subjects[subject].targets[today] = target;
     data.subjects[subject].history[today] = actual;
 
-    // STREAK LOGIC
     if (data.lastDate !== today) {
-        if (actual >= 0.8 * target) {
-            data.streak += 1;
-        } else {
-            data.streak = 0;
-        }
+        data.streak = actual >= 0.8 * target ? data.streak + 1 : 0;
         data.lastDate = today;
     }
 
-    saveData(data);
+    if (!saveData(data)) {
+        return false;
+    }
+
+    setStatus("Today's study data was saved.", "success");
     loadTodaySummary();
+    return true;
 }
 
 function loadTodaySummary() {
+    const subjectSelect = getElement("subjectSelect");
+    if (!subjectSelect) {
+        return;
+    }
+
     const data = getData();
     const today = getToday();
-    const subject = document.getElementById("subjectSelect").value;
+    const subject = subjectSelect.value;
+    const values = data.subjects[subject] || { history: {}, targets: {} };
+    const target = values.targets[today] || 0;
+    const actual = values.history[today] || 0;
+    const completion = target ? ((actual / target) * 100).toFixed(1) : "0";
 
-    const target = data.subjects[subject]?.targets[today] || 0;
-    const actual = data.subjects[subject]?.history[today] || 0;
-    const completion = target ? ((actual / target) * 100).toFixed(1) : 0;
-    const difference = target - actual;
-
-    document.getElementById("summaryTarget").textContent = target;
-    document.getElementById("summaryActual").textContent = actual;
-    document.getElementById("summaryCompletion").textContent = completion + "%";
-    document.getElementById("summaryDifference").textContent = difference;
+    const summary = {
+        summaryTarget: target,
+        summaryActual: actual,
+        summaryCompletion: `${completion}%`,
+        summaryDifference: target - actual
+    };
+    for (const [id, value] of Object.entries(summary)) {
+        const element = getElement(id);
+        if (element) {
+            element.textContent = value;
+        }
+    }
 }
-
-/*********************************************************
-  HOME PAGE LOGIC
-*********************************************************/
 
 function loadHomePage() {
     const data = getData();
     const today = getToday();
-
     let todayTarget = 0;
-    let tasks = [];
+    const tasks = [];
 
-    for (let subject in data.subjects) {
-        let target = data.subjects[subject].targets[today];
-        if (target) {
+    for (const [subject, values] of getSubjectEntries(data)) {
+        const target = values.targets[today];
+        if (target !== undefined) {
             todayTarget += target;
-            tasks.push(subject + " (" + target + ")");
+            tasks.push(`${subject} (${target})`);
         }
     }
 
-    document.getElementById("streakValue").textContent = data.streak + " days";
-    document.getElementById("todayTarget").textContent =
-        todayTarget ? todayTarget : "No target set";
+    const streak = getElement("streakValue");
+    const target = getElement("todayTarget");
+    const list = getElement("todayTasks");
+    if (streak) {
+        streak.textContent = `${data.streak} days`;
+    }
+    if (target) {
+        target.textContent = todayTarget ? todayTarget : "No target set";
+    }
+    if (!list) {
+        return;
+    }
 
-    const list = document.getElementById("todayTasks");
-    list.innerHTML = "";
-
+    list.replaceChildren();
     if (tasks.length === 0) {
-        list.innerHTML = "<li>No tasks added</li>";
-    } else {
-        tasks.forEach(task => {
-            let li = document.createElement("li");
-            li.textContent = task;
-            list.appendChild(li);
-        });
+        const item = document.createElement("li");
+        item.textContent = "No tasks added";
+        list.appendChild(item);
+        return;
+    }
+
+    for (const task of tasks) {
+        const item = document.createElement("li");
+        item.textContent = task;
+        list.appendChild(item);
     }
 }
-
-/*********************************************************
-  PROGRESS PAGE LOGIC
-*********************************************************/
 
 function loadProgressPage() {
     const data = getData();
+    const { totalStudy, totalTarget, subjectTotals } = calculateTotals(data);
+    const subjectDiv = getElement("subjectProgress");
 
-    let totalStudy = 0;
-    let totalTarget = 0;
-
-    const subjectDiv = document.getElementById("subjectProgress");
-    subjectDiv.innerHTML = "";
-
-    for (let subject in data.subjects) {
-        let subStudy = 0;
-        let subTarget = 0;
-
-        for (let day in data.subjects[subject].history) {
-            subStudy += data.subjects[subject].history[day];
-            subTarget += data.subjects[subject].targets[day] || 0;
+    if (subjectDiv) {
+        subjectDiv.replaceChildren();
+        for (const [subject, study] of Object.entries(subjectTotals)) {
+            const target = data.subjects[subject].targets;
+            const subjectTarget = Object.values(target).reduce((sum, amount) => sum + amount, 0);
+            const percent = subjectTarget ? ((study / subjectTarget) * 100).toFixed(1) : "0";
+            const paragraph = document.createElement("p");
+            const strong = document.createElement("strong");
+            strong.textContent = `${subject}:`;
+            paragraph.append(strong, ` ${study} / ${subjectTarget} (${percent}%)`);
+            subjectDiv.appendChild(paragraph);
         }
-
-        totalStudy += subStudy;
-        totalTarget += subTarget;
-
-        let percent = subTarget ? ((subStudy / subTarget) * 100).toFixed(1) : 0;
-
-        subjectDiv.innerHTML += `
-            <p><strong>${subject}:</strong> ${subStudy} / ${subTarget} (${percent}%)</p>
-        `;
     }
 
-    document.getElementById("totalStudy").textContent = totalStudy;
-    document.getElementById("totalTarget").textContent = totalTarget;
-    document.getElementById("overallCompletion").textContent =
-        totalTarget ? ((totalStudy / totalTarget) * 100).toFixed(1) + "%" : "0%";
+    const values = {
+        totalStudy,
+        totalTarget,
+        overallCompletion: totalTarget ? `${((totalStudy / totalTarget) * 100).toFixed(1)}%` : "0%"
+    };
+    for (const [id, value] of Object.entries(values)) {
+        const element = getElement(id);
+        if (element) {
+            element.textContent = value;
+        }
+    }
 }
-
-/*********************************************************
-  IDEAL STUDENT PAGE LOGIC
-*********************************************************/
 
 function loadIdealPage() {
     const data = getData();
     const today = getToday();
-
     let yourToday = 0;
     let idealToday = 0;
     let yourTotal = 0;
     let idealTotal = 0;
 
-    for (let subject in data.subjects) {
-        for (let day in data.subjects[subject].targets) {
-            idealTotal += data.subjects[subject].targets[day];
-            yourTotal += data.subjects[subject].history[day] || 0;
+    for (const values of Object.values(data.subjects)) {
+        for (const [day, target] of Object.entries(values.targets)) {
+            idealTotal += target;
+            yourTotal += values.history[day] || 0;
         }
-
-        idealToday += data.subjects[subject].targets[today] || 0;
-        yourToday += data.subjects[subject].history[today] || 0;
+        idealToday += values.targets[today] || 0;
+        yourToday += values.history[today] || 0;
     }
 
-    document.getElementById("idealToday").textContent = idealToday;
-    document.getElementById("yourToday").textContent = yourToday;
-    document.getElementById("todayGap").textContent = idealToday - yourToday;
-
-    document.getElementById("idealTotal").textContent = idealTotal;
-    document.getElementById("yourTotal").textContent = yourTotal;
-    document.getElementById("totalGap").textContent = idealTotal - yourTotal;
-
-    document.getElementById("interpretationText").textContent =
-        yourTotal >= idealTotal
+    const values = {
+        idealToday,
+        yourToday,
+        todayGap: idealToday - yourToday,
+        idealTotal,
+        yourTotal,
+        totalGap: idealTotal - yourTotal,
+        interpretationText: yourTotal >= idealTotal
             ? "You are matching or exceeding the ideal learning pace."
-            : "You are behind the ideal learning pace. Improve consistency.";
+            : "You are behind the ideal learning pace. Improve consistency."
+    };
+    for (const [id, value] of Object.entries(values)) {
+        const element = getElement(id);
+        if (element) {
+            element.textContent = value;
+        }
+    }
 }
-
-/*********************************************************
-  ANALYSIS PAGE LOGIC
-*********************************************************/
 
 function loadAnalysisPage() {
     const data = getData();
-
-    let totalStudy = 0;
-    let totalTarget = 0;
-    let subjectTotals = {};
-
-    for (let subject in data.subjects) {
-        subjectTotals[subject] = 0;
-        for (let day in data.subjects[subject].history) {
-            totalStudy += data.subjects[subject].history[day];
-            subjectTotals[subject] += data.subjects[subject].history[day];
-            totalTarget += data.subjects[subject].targets[day] || 0;
-        }
-    }
-
-    let strongest = "-";
-    let weakest = "-";
-    let max = -1, min = Infinity;
-
-    for (let s in subjectTotals) {
-        if (subjectTotals[s] > max) {
-            max = subjectTotals[s];
-            strongest = s;
-        }
-        if (subjectTotals[s] < min) {
-            min = subjectTotals[s];
-            weakest = s;
-        }
-    }
-
-    document.getElementById("analysisTotalStudy").textContent = totalStudy;
-    document.getElementById("analysisTotalTarget").textContent = totalTarget;
-    document.getElementById("analysisCompletion").textContent =
-        totalTarget ? ((totalStudy / totalTarget) * 100).toFixed(1) + "%" : "0%";
-
-    document.getElementById("analysisStreak").textContent = data.streak;
-
-    const daysTracked = Object.values(data.subjects)[0]
-        ? Object.keys(Object.values(data.subjects)[0].history).length
-        : 0;
-
-    document.getElementById("analysisAverage").textContent =
-        daysTracked ? (totalStudy / daysTracked).toFixed(2) : 0;
-
-    document.getElementById("strongestSubject").textContent = strongest;
-    document.getElementById("weakestSubject").textContent = weakest;
-
-    document.getElementById("reflectionText").textContent =
-        data.streak >= 3
+    const { totalStudy, totalTarget, subjectTotals, allDays } = calculateTotals(data);
+    const subjects = Object.entries(subjectTotals);
+    const strongest = subjects.length ? subjects.reduce((a, b) => a[1] >= b[1] ? a : b)[0] : "-";
+    const weakest = subjects.length ? subjects.reduce((a, b) => a[1] <= b[1] ? a : b)[0] : "-";
+    const values = {
+        analysisTotalStudy: totalStudy,
+        analysisTotalTarget: totalTarget,
+        analysisCompletion: totalTarget ? `${((totalStudy / totalTarget) * 100).toFixed(1)}%` : "0%",
+        analysisStreak: data.streak,
+        analysisAverage: allDays.size ? (totalStudy / allDays.size).toFixed(2) : "0",
+        strongestSubject: strongest,
+        weakestSubject: weakest,
+        reflectionText: data.streak >= 3
             ? "You show good consistency. Keep maintaining your streak."
-            : "Your consistency needs improvement. Try to meet daily targets.";
+            : "Your consistency needs improvement. Try to meet daily targets."
+    };
+    for (const [id, value] of Object.entries(values)) {
+        const element = getElement(id);
+        if (element) {
+            element.textContent = value;
+        }
+    }
 }
-
-/*********************************************************
-  FORECAST PAGE LOGIC
-*********************************************************/
 
 function loadForecastPage() {
     const data = getData();
-
-    let totalStudy = 0;
-    let totalTarget = 0;
-    let allDays = new Set();
-
-    for (let subject in data.subjects) {
-        for (let day in data.subjects[subject].history) {
-            totalStudy += data.subjects[subject].history[day];
-            totalTarget += data.subjects[subject].targets[day] || 0;
-            allDays.add(day);
+    const { totalStudy, totalTarget, allDays } = calculateTotals(data);
+    const remaining = Math.max(totalTarget - totalStudy, 0);
+    const average = allDays.size ? totalStudy / allDays.size : 0;
+    const daysNeeded = average ? Math.ceil(remaining / average) : 0;
+    const values = {
+        completedStudy: totalStudy,
+        requiredStudy: totalTarget,
+        remainingStudy: remaining,
+        averageDaily: average.toFixed(2),
+        totalDays: allDays.size,
+        estimatedDays: daysNeeded > 0 ? `${daysNeeded} days` : "Not enough data"
+    };
+    for (const [id, value] of Object.entries(values)) {
+        const element = getElement(id);
+        if (element) {
+            element.textContent = value;
         }
     }
-
-    let remaining = totalTarget - totalStudy;
-    let average = allDays.size ? (totalStudy / allDays.size) : 0;
-    let daysNeeded = average ? Math.ceil(remaining / average) : 0;
-
-    document.getElementById("completedStudy").textContent = totalStudy;
-    document.getElementById("requiredStudy").textContent = totalTarget;
-    document.getElementById("remainingStudy").textContent = remaining;
-    document.getElementById("averageDaily").textContent = average.toFixed(2);
-    document.getElementById("totalDays").textContent = allDays.size;
-    document.getElementById("estimatedDays").textContent =
-        daysNeeded > 0 ? daysNeeded + " days" : "Not enough data";
 }
-/********************************************************/
+
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+    const initialData = getData();
+    if (Object.keys(initialData.subjects).length === 0) {
+        initialData.subjects["General Study"] = { history: {}, targets: {} };
+        saveData(initialData);
+    }
+}
+
+if (typeof module !== "undefined") {
+    module.exports = {
+        calculateTotals,
+        createDefaultData,
+        sanitiseData
+    };
+}
