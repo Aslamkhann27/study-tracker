@@ -32,6 +32,7 @@ API base URL: `http://127.0.0.1:8000/api/`. The frontend reads this from the roo
 - `GET/POST entries/` — list/create study records
 - `GET/PUT/PATCH/DELETE entries/{id}/` — manage study records
 - `GET dashboard/` — today's totals, all-time totals, streak and subjects
+- `GET health/` — public database-aware health check; returns 503 if database is unavailable
 
 All endpoints except registration and token issuance require `Authorization: Bearer <access>`. Users can only see and modify their own subjects and study entries.
 
@@ -50,6 +51,10 @@ gunicorn config.wsgi:application
 ```
 
 Set `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS=<your-render-hostname>`, `DATABASE_URL=<PostgreSQL-internal-connection-string>`, and `CORS_ALLOWED_ORIGINS=<your-frontend-origin>`. Never commit real secrets. Use a persistent PostgreSQL database in production; SQLite is only the local development fallback.
+
+## Free uptime ping (GitHub Actions)
+
+The workflow at `.github/workflows/render-health-ping.yml` calls `/api/health/` every 5 minutes. Scheduled workflows run from the repository default branch, so this starts only after the workflow is merged into `main`. It uses GitHub Actions' free allowance. Set the repository Actions variable `RENDER_HEALTH_URL` to the deployed health URL, e.g. `https://YOUR-SERVICE.onrender.com/api/health/`. This is best-effort only: scheduled runs can be delayed, and Render may still suspend or restart a free service; uptime is not guaranteed.
 
 ## Current status
 
