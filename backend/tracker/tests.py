@@ -31,3 +31,10 @@ class StudyTrackerApiTests(APITestCase):
         self.client.force_authenticate(user=None)
         response = self.client.get("/api/dashboard/")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class HealthEndpointTests(APITestCase):
+    def test_health_is_public_and_checks_database(self):
+        response = self.client.get("/api/health/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"status": "ok", "database": "ok"})
