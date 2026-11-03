@@ -140,3 +140,18 @@ li {
         margin: 8px 0;
     }
 }
+
+
+/* Account and authentication controls */
+#accountPanel { max-width: 900px; margin: 12px auto; padding: 0 20px; }
+.account-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.account-actions button, .auth-form button { width: auto; padding: 9px 14px; margin: 0; }
+.auth-form { max-width: 420px; margin: 14px 0 0 auto; padding: 18px; background: #fff; border: 1px solid #dbe2ea; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.auth-form h3 { margin-top: 0; }
+.auth-form button { margin-top: 12px; }
+.auth-form .secondary-button { background: #64748b; }
+[hidden] { display: none !important; }
+@media (max-width: 600px) {
+  .account-actions { justify-content: center; }
+  .auth-form { margin: 14px auto 0; }
+}

@@ -1,400 +1,393 @@
-const STORAGE_KEY = "studyData";
+/* Study Tracker frontend: Django REST API integration */
+const API_BASE = (window.STUDY_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+const ACCESS_KEY = "studyAccessToken";
+const REFRESH_KEY = "studyRefreshToken";
+let refreshInFlight = null;
 
-function createDefaultData() {
-    return {
-        subjects: {},
-        streak: 0,
-        lastDate: null
-    };
+function getAccessToken() { return localStorage.getItem(ACCESS_KEY); }
+function setTokens(data) {
+    localStorage.setItem(ACCESS_KEY, data.access);
+    if (data.refresh) localStorage.setItem(REFRESH_KEY, data.refresh);
 }
-
-function isRecord(value) {
-    return value !== null && typeof value === "object" && !Array.isArray(value);
+function clearTokens() {
+    localStorage.removeItem(ACCESS_KEY);
+    localStorage.removeItem(REFRESH_KEY);
 }
-
-function normaliseEntries(value) {
-    if (!isRecord(value)) {
-        return {};
-    }
-
-    return Object.fromEntries(
-        Object.entries(value)
-            .filter(([key, amount]) =>
-                key.trim().length > 0 &&
-                Number.isFinite(amount) &&
-                amount >= 0
-            )
-            .map(([key, amount]) => [key.trim().slice(0, 100), amount])
-    );
+async function refreshAccessToken() {
+    if (refreshInFlight) return refreshInFlight;
+    const refresh = localStorage.getItem(REFRESH_KEY);
+    if (!refresh) return false;
+    refreshInFlight = (async () => {
+        try {
+            const response = await fetch(API_BASE + "/auth/token/refresh/", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ refresh })
+            });
+            if (!response.ok) throw new Error("Session expired");
+            const data = await response.json();
+            localStorage.setItem(ACCESS_KEY, data.access);
+            if (data.refresh) localStorage.setItem(REFRESH_KEY, data.refresh);
+            return true;
+        } catch (_) {
+            clearTokens();
+            return false;
+        } finally {
+            refreshInFlight = null;
+        }
+    })();
+    return refreshInFlight;
 }
-
-function sanitiseData(value) {
-    const data = createDefaultData();
-
-    if (!isRecord(value)) {
-        return data;
-    }
-
-    if (isRecord(value.subjects)) {
-        for (const [subjectName, subjectValue] of Object.entries(value.subjects)) {
-            const subject = subjectName.trim().slice(0, 100);
-            if (!subject || !isRecord(subjectValue)) {
-                continue;
-            }
-
-            data.subjects[subject] = {
-                history: normaliseEntries(subjectValue.history),
-                targets: normaliseEntries(subjectValue.targets)
-            };
+async function logout() {
+    const refresh = localStorage.getItem(REFRESH_KEY);
+    if (refresh) {
+        try {
+            await fetch(API_BASE + "/auth/logout/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(getAccessToken() ? { Authorization: "Bearer " + getAccessToken() } : {}) },
+                body: JSON.stringify({ refresh }),
+                keepalive: true
+            });
+        } catch (_) {
+            // Local token removal still prevents this browser from using the session.
         }
     }
-
-    if (Number.isFinite(value.streak) && value.streak >= 0) {
-        data.streak = Math.floor(value.streak);
+    clearTokens();
+    updateAccountUI();
+    location.reload();
+}
+async function api(path, options = {}, retry = true) {
+    const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+    if (getAccessToken()) headers.Authorization = "Bearer " + getAccessToken();
+    const response = await fetch(API_BASE + path, { ...options, headers });
+    if (response.status === 401 && retry && await refreshAccessToken()) return api(path, options, false);
+    if (!response.ok) {
+        let detail = "Request failed (" + response.status + ")";
+        try {
+            const body = await response.json();
+            detail = Object.entries(body).map(([key, value]) =>
+                key + ": " + (Array.isArray(value) ? value.join(" ") : typeof value === "object" ? JSON.stringify(value) : value)
+            ).join(" | ") || detail;
+        } catch (_) {}
+        throw new Error(detail);
     }
+    if (response.status === 204) return null;
+    return response.json();
+}
+async function apiList(path) {
+    const data = await api(path);
+    return Array.isArray(data) ? data : (data.results || []);
+}
+function todayISO() {
+    const now = new Date();
+    return [now.getFullYear(), String(now.getMonth()+1).padStart(2,"0"), String(now.getDate()).padStart(2,"0")].join("-");
+}
+function displayDate(iso) {
+    const [y,m,d] = iso.split("-").map(Number);
+    return new Date(y, m-1, d).toDateString();
+}
+function getToday() { return displayDate(todayISO()); }
 
-    if (typeof value.lastDate === "string" && value.lastDate.length <= 100) {
-        data.lastDate = value.lastDate;
-    }
-
+let currentDashboard = null;
+async function loadStudyData() {
+    const [subjects, entries, dashboard] = await Promise.all([
+        apiList("/subjects/"), apiList("/entries/"), api("/dashboard/")
+    ]);
+    currentDashboard = dashboard;
+    const data = { subjects: {}, streak: dashboard.streak || 0, lastDate: null };
+    subjects.forEach(subject => data.subjects[subject.name] = { id: subject.id, history: {}, targets: {} });
+    entries.forEach(entry => {
+        const name = entry.subject_name || (subjects.find(s => s.id === entry.subject)?.name);
+        if (!name) return;
+        if (!data.subjects[name]) data.subjects[name] = { id: entry.subject, history: {}, targets: {} };
+        const day = displayDate(entry.study_date);
+        data.subjects[name].history[day] = Number(entry.actual_hours);
+        data.subjects[name].targets[day] = Number(entry.target_hours);
+    });
     return data;
 }
-
-function getElement(id) {
-    return typeof document === "undefined" ? null : document.getElementById(id);
+function showStatus(elementId, message, isError = false) {
+    const element = document.getElementById(elementId);
+    if (element) { element.textContent = message; element.style.color = isError ? "#b91c1c" : "#15803d"; }
 }
-
-function setStatus(message, type = "error") {
-    const status = getElement("statusMessage");
-    if (!status) {
-        return;
+function mountAccountUI() {
+    const nav = document.querySelector("nav");
+    if (!nav || document.getElementById("accountPanel")) return;
+    const panel = document.createElement("div");
+    panel.id = "accountPanel";
+    panel.innerHTML = `
+      <div class="account-actions">
+        <span id="accountStatus">Not signed in</span>
+        <button type="button" id="showLogin">Log in</button>
+        <button type="button" id="showRegister">Create account</button>
+        <button type="button" id="logoutButton" hidden>Log out</button>
+      </div>
+      <form id="authForm" class="auth-form" hidden>
+        <h3 id="authHeading">Log in to Study Tracker</h3>
+        <label for="authUsername">Username</label><input id="authUsername" autocomplete="username" required>
+        <label for="authEmail">Email (registration only)</label><input id="authEmail" type="email" autocomplete="email">
+        <label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="8" required>
+        <button id="authSubmit" type="submit">Log in</button>
+        <button id="authCancel" type="button" class="secondary-button">Cancel</button>
+        <p id="authMessage" role="status" aria-live="polite"></p>
+      </form>`;
+    nav.insertAdjacentElement("afterend", panel);
+    let mode = "login";
+    const form = document.getElementById("authForm");
+    function setMode(next) {
+        mode = next;
+        form.hidden = false;
+        document.getElementById("authHeading").textContent = next === "login" ? "Log in to Study Tracker" : "Create your account";
+        document.getElementById("authEmail").hidden = next === "login";
+        document.getElementById("authEmail").required = next === "register";
+        document.getElementById("authSubmit").textContent = next === "login" ? "Log in" : "Create account";
+        showStatus("authMessage", "");
     }
-
-    status.textContent = message;
-    status.dataset.type = type;
+    document.getElementById("showLogin").onclick = () => setMode("login");
+    document.getElementById("showRegister").onclick = () => setMode("register");
+    document.getElementById("authCancel").onclick = () => { form.hidden = true; };
+    document.getElementById("logoutButton").onclick = logout;
+    form.addEventListener("submit", async event => {
+        event.preventDefault();
+        const username = document.getElementById("authUsername").value.trim();
+        const password = document.getElementById("authPassword").value;
+        const email = document.getElementById("authEmail").value.trim();
+        const submit = document.getElementById("authSubmit");
+        submit.disabled = true;
+        try {
+            if (mode === "register") {
+                await api("/auth/register/", { method: "POST", body: JSON.stringify({ username, email, password }) });
+            }
+            const tokens = await fetch(API_BASE + "/auth/token/", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password })
+            });
+            if (!tokens.ok) throw new Error(mode === "register" ? "Account created. Please log in." : "Invalid username or password.");
+            setTokens(await tokens.json());
+            showStatus("authMessage", "Signed in successfully.");
+            updateAccountUI();
+            await loadCurrentPage();
+            form.hidden = true;
+        } catch (error) { showStatus("authMessage", error.message, true); }
+        finally { submit.disabled = false; }
+    });
+    setMode("login");
+    updateAccountUI();
 }
-
-function getData() {
-    if (typeof localStorage === "undefined") {
-        return createDefaultData();
-    }
-
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        const data = sanitiseData(stored ? JSON.parse(stored) : null);
-        if (!stored) {
-            saveData(data);
-        }
-        return data;
-    } catch (error) {
-        setStatus("Saved study data could not be read. A new empty plan is being used.");
-        return createDefaultData();
-    }
+function updateAccountUI() {
+    const signedIn = Boolean(getAccessToken());
+    const status = document.getElementById("accountStatus");
+    if (status) status.textContent = signedIn ? "Signed in" : "Not signed in";
+    const login = document.getElementById("showLogin");
+    const register = document.getElementById("showRegister");
+    const logout = document.getElementById("logoutButton");
+    if (login) login.hidden = signedIn;
+    if (register) register.hidden = signedIn;
+    if (logout) logout.hidden = !signedIn;
 }
-
-function saveData(data) {
-    if (typeof localStorage === "undefined") {
+async function requireLogin() {
+    if (!getAccessToken() && !await refreshAccessToken()) {
+        const status = document.getElementById("accountStatus");
+        if (status) status.textContent = "Please log in to load your study data.";
+        const form = document.getElementById("authForm");
+        if (form) form.hidden = false;
         return false;
     }
-
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitiseData(data)));
-        return true;
-    } catch (error) {
-        setStatus("Study data could not be saved. Check available browser storage.");
-        return false;
-    }
-}
-
-function getToday() {
-    return new Date().toDateString();
-}
-
-function getSubjectEntries(data) {
-    return Object.entries(data.subjects);
-}
-
-function calculateTotals(data) {
-    let totalStudy = 0;
-    let totalTarget = 0;
-    const allDays = new Set();
-    const subjectTotals = {};
-
-    for (const [subject, values] of getSubjectEntries(data)) {
-        subjectTotals[subject] = 0;
-        for (const [day, amount] of Object.entries(values.history)) {
-            totalStudy += amount;
-            subjectTotals[subject] += amount;
-            totalTarget += values.targets[day] || 0;
-            allDays.add(day);
-        }
-    }
-
-    return { totalStudy, totalTarget, allDays, subjectTotals };
-}
-
-function loadTodayPage() {
-    const subjectSelect = getElement("subjectSelect");
-    if (!subjectSelect) {
-        return;
-    }
-
-    const data = getData();
-    if (Object.keys(data.subjects).length === 0) {
-        data.subjects["General Study"] = { history: {}, targets: {} };
-        saveData(data);
-    }
-
-    subjectSelect.replaceChildren();
-    for (const subject of Object.keys(data.subjects)) {
-        const option = document.createElement("option");
-        option.value = subject;
-        option.textContent = subject;
-        subjectSelect.appendChild(option);
-    }
-
-    loadTodaySummary();
-}
-
-function saveTodayData() {
-    const subjectSelect = getElement("subjectSelect");
-    const targetInput = getElement("todayTarget");
-    const actualInput = getElement("actualStudy");
-    if (!subjectSelect || !targetInput || !actualInput) {
-        return false;
-    }
-
-    const subject = subjectSelect.value.trim();
-    const target = Number(targetInput.value);
-    const actual = Number(actualInput.value);
-
-    if (!subject || !Number.isFinite(target) || target < 0 ||
-        !Number.isFinite(actual) || actual < 0) {
-        setStatus("Enter non-negative numbers for both target and actual study.");
-        return false;
-    }
-
-    const data = getData();
-    const today = getToday();
-    if (!data.subjects[subject]) {
-        data.subjects[subject] = { history: {}, targets: {} };
-    }
-
-    data.subjects[subject].targets[today] = target;
-    data.subjects[subject].history[today] = actual;
-
-    if (data.lastDate !== today) {
-        data.streak = actual >= 0.8 * target ? data.streak + 1 : 0;
-        data.lastDate = today;
-    }
-
-    if (!saveData(data)) {
-        return false;
-    }
-
-    setStatus("Today's study data was saved.", "success");
-    loadTodaySummary();
+    updateAccountUI();
     return true;
 }
-
-function loadTodaySummary() {
-    const subjectSelect = getElement("subjectSelect");
-    if (!subjectSelect) {
-        return;
-    }
-
-    const data = getData();
-    const today = getToday();
-    const subject = subjectSelect.value;
-    const values = data.subjects[subject] || { history: {}, targets: {} };
-    const target = values.targets[today] || 0;
-    const actual = values.history[today] || 0;
-    const completion = target ? ((actual / target) * 100).toFixed(1) : "0";
-
-    const summary = {
-        summaryTarget: target,
-        summaryActual: actual,
-        summaryCompletion: `${completion}%`,
-        summaryDifference: target - actual
+async function loadCurrentPage() {
+    if (!await requireLogin()) return;
+    const page = location.pathname.split("/").pop() || "index.html";
+    const loaders = {
+        "index.html": loadHomePage, "today.html": loadTodayPage,
+        "progress.html": loadProgressPage, "ideal.html": loadIdealPage,
+        "analysis.html": loadAnalysisPage, "forecast.html": loadForecastPage
     };
-    for (const [id, value] of Object.entries(summary)) {
-        const element = getElement(id);
-        if (element) {
-            element.textContent = value;
-        }
-    }
+    if (loaders[page]) await loaders[page]();
 }
 
-function loadHomePage() {
-    const data = getData();
-    const today = getToday();
-    let todayTarget = 0;
-    const tasks = [];
-
-    for (const [subject, values] of getSubjectEntries(data)) {
-        const target = values.targets[today];
-        if (target !== undefined) {
-            todayTarget += target;
-            tasks.push(`${subject} (${target})`);
-        }
-    }
-
-    const streak = getElement("streakValue");
-    const target = getElement("todayTarget");
-    const list = getElement("todayTasks");
-    if (streak) {
-        streak.textContent = `${data.streak} days`;
-    }
-    if (target) {
-        target.textContent = todayTarget ? todayTarget : "No target set";
-    }
-    if (!list) {
-        return;
-    }
-
-    list.replaceChildren();
-    if (tasks.length === 0) {
-        const item = document.createElement("li");
-        item.textContent = "No tasks added";
-        list.appendChild(item);
-        return;
-    }
-
-    for (const task of tasks) {
-        const item = document.createElement("li");
-        item.textContent = task;
-        list.appendChild(item);
-    }
+/* TODAY */
+async function loadTodayPage() {
+    try {
+        const data = await loadStudyData();
+        const select = document.getElementById("subjectSelect");
+        if (!select) return;
+        const previous = select.value;
+        select.innerHTML = "";
+        Object.keys(data.subjects).sort((a,b)=>a.localeCompare(b)).forEach(name => {
+            const option = document.createElement("option");
+            option.value = name; option.textContent = name; select.appendChild(option);
+        });
+        if (!select.options.length) {
+            const created = await api("/subjects/", { method: "POST", body: JSON.stringify({ name: "General Study" }) });
+            const option = document.createElement("option");
+            option.value = created.name; option.textContent = created.name; select.appendChild(option);
+        } else if (previous && data.subjects[previous]) select.value = previous;
+        await loadTodaySummary();
+    } catch (error) { showStatus("subjectMessage", error.message, true); }
+}
+async function addSubject() {
+    const input = document.getElementById("newSubjectName");
+    const name = input.value.trim();
+    if (!name) return showStatus("subjectMessage", "Enter a subject name first.", true);
+    try {
+        await api("/subjects/", { method: "POST", body: JSON.stringify({ name }) });
+        input.value = ""; showStatus("subjectMessage", name + " added successfully.");
+        await loadTodayPage();
+        document.getElementById("subjectSelect").value = name;
+        await loadTodaySummary();
+    } catch (error) { showStatus("subjectMessage", error.message, true); }
+}
+async function saveTodayData() {
+    const name = document.getElementById("subjectSelect").value;
+    const targetInput = document.getElementById("todayTarget");
+    const actualInput = document.getElementById("actualStudy");
+    const target = Number(targetInput.value), actual = Number(actualInput.value);
+    if (!name) return showStatus("saveMessage", "Add or select a subject before saving.", true);
+    if (!targetInput.value.trim() || !Number.isFinite(target) || target <= 0)
+        return showStatus("saveMessage", "Enter a target greater than zero.", true);
+    if (!actualInput.value.trim() || !Number.isFinite(actual) || actual < 0)
+        return showStatus("saveMessage", "Enter a valid study amount (zero or more).", true);
+    try {
+        const subjects = await apiList("/subjects/");
+        const subject = subjects.find(item => item.name === name);
+        if (!subject) throw new Error("Selected subject was not found. Refresh and try again.");
+        const today = todayISO();
+        const entries = await apiList("/entries/?study_date=" + today);
+        const existing = entries.find(entry => entry.subject === subject.id && entry.study_date === today);
+        const payload = { subject: subject.id, study_date: today, target_hours: target, actual_hours: actual };
+        await api(existing ? "/entries/" + existing.id + "/" : "/entries/", {
+            method: existing ? "PATCH" : "POST", body: JSON.stringify(payload)
+        });
+        showStatus("saveMessage", "Today's study data saved.");
+        await loadTodaySummary();
+    } catch (error) { showStatus("saveMessage", error.message, true); }
+}
+async function loadTodaySummary() {
+    if (!getAccessToken()) return;
+    try {
+        const select = document.getElementById("subjectSelect");
+        if (!select) return;
+        const name = select.value;
+        const subjects = await apiList("/subjects/");
+        const subject = subjects.find(item => item.name === name);
+        const entries = subject ? await apiList("/entries/?study_date=" + todayISO()) : [];
+        const entry = entries.find(item => item.subject === subject?.id && item.study_date === todayISO());
+        const target = Number(entry?.target_hours || 0), actual = Number(entry?.actual_hours || 0);
+        document.getElementById("summaryTarget").textContent = target;
+        document.getElementById("summaryActual").textContent = actual;
+        document.getElementById("summaryCompletion").textContent = (target ? actual / target * 100 : 0).toFixed(1) + "%";
+        document.getElementById("summaryDifference").textContent = (target - actual).toFixed(2);
+        if (document.getElementById("todayTarget")) document.getElementById("todayTarget").value = target || "";
+        if (document.getElementById("actualStudy")) document.getElementById("actualStudy").value = entry ? actual : "";
+    } catch (error) { showStatus("saveMessage", error.message, true); }
 }
 
-function loadProgressPage() {
-    const data = getData();
-    const { totalStudy, totalTarget, subjectTotals } = calculateTotals(data);
-    const subjectDiv = getElement("subjectProgress");
-
-    if (subjectDiv) {
-        subjectDiv.replaceChildren();
-        for (const [subject, study] of Object.entries(subjectTotals)) {
-            const target = data.subjects[subject].targets;
-            const subjectTarget = Object.values(target).reduce((sum, amount) => sum + amount, 0);
-            const percent = subjectTarget ? ((study / subjectTarget) * 100).toFixed(1) : "0";
-            const paragraph = document.createElement("p");
-            const strong = document.createElement("strong");
-            strong.textContent = `${subject}:`;
-            paragraph.append(strong, ` ${study} / ${subjectTarget} (${percent}%)`);
-            subjectDiv.appendChild(paragraph);
-        }
-    }
-
-    const values = {
-        totalStudy,
-        totalTarget,
-        overallCompletion: totalTarget ? `${((totalStudy / totalTarget) * 100).toFixed(1)}%` : "0%"
-    };
-    for (const [id, value] of Object.entries(values)) {
-        const element = getElement(id);
-        if (element) {
-            element.textContent = value;
-        }
-    }
+/* HOME */
+async function loadHomePage() {
+    try {
+        const dashboard = await api("/dashboard/");
+        document.getElementById("streakValue").textContent = dashboard.streak + " days";
+        document.getElementById("todayTarget").textContent = dashboard.today.target_hours || "No target set";
+        const list = document.getElementById("todayTasks");
+        list.innerHTML = "";
+        const entries = (await apiList("/entries/")).filter(entry => entry.study_date === todayISO());
+        const subjects = dashboard.subjects || [];
+        entries.forEach(entry => {
+            const subject = subjects.find(item => item.id === entry.subject);
+            const li = document.createElement("li");
+            li.textContent = (subject?.name || entry.subject_name || "Subject") + " (" + entry.target_hours + ")";
+            list.appendChild(li);
+        });
+        if (!list.children.length) list.innerHTML = "<li>No tasks added</li>";
+    } catch (error) { showStatus("accountStatus", error.message, true); }
 }
 
-function loadIdealPage() {
-    const data = getData();
-    const today = getToday();
-    let yourToday = 0;
-    let idealToday = 0;
-    let yourTotal = 0;
-    let idealTotal = 0;
-
-    for (const values of Object.values(data.subjects)) {
-        for (const [day, target] of Object.entries(values.targets)) {
-            idealTotal += target;
-            yourTotal += values.history[day] || 0;
-        }
-        idealToday += values.targets[today] || 0;
-        yourToday += values.history[today] || 0;
-    }
-
-    const values = {
-        idealToday,
-        yourToday,
-        todayGap: idealToday - yourToday,
-        idealTotal,
-        yourTotal,
-        totalGap: idealTotal - yourTotal,
-        interpretationText: yourTotal >= idealTotal
+/* SHARED ANALYTICS */
+async function getAnalyticsData() {
+    const [subjects, entries, dashboard] = await Promise.all([
+        apiList("/subjects/"), apiList("/entries/"), api("/dashboard/")
+    ]);
+    const totals = { study: 0, target: 0, bySubject: {}, days: new Set(), todayStudy: 0, todayTarget: 0 };
+    subjects.forEach(subject => totals.bySubject[subject.name] = { study: 0, target: 0 });
+    entries.forEach(entry => {
+        const name = subjects.find(s => s.id === entry.subject)?.name || entry.subject_name || "Other";
+        const actual = Number(entry.actual_hours), target = Number(entry.target_hours);
+        totals.study += actual; totals.target += target;
+        if (!totals.bySubject[name]) totals.bySubject[name] = { study: 0, target: 0 };
+        totals.bySubject[name].study += actual; totals.bySubject[name].target += target;
+        totals.days.add(entry.study_date);
+        if (entry.study_date === todayISO()) { totals.todayStudy += actual; totals.todayTarget += target; }
+    });
+    totals.streak = dashboard.streak || 0;
+    return totals;
+}
+async function loadProgressPage() {
+    try {
+        const d = await getAnalyticsData();
+        document.getElementById("totalStudy").textContent = d.study;
+        document.getElementById("totalTarget").textContent = d.target;
+        document.getElementById("overallCompletion").textContent = (d.target ? d.study/d.target*100 : 0).toFixed(1) + "%";
+        const box = document.getElementById("subjectProgress"); box.innerHTML = "";
+        Object.entries(d.bySubject).forEach(([name, values]) => {
+            const row = document.createElement("p");
+            const strong = document.createElement("strong"); strong.textContent = name + ": ";
+            row.append(strong, document.createTextNode(values.study + " / " + values.target + " (" + (values.target ? values.study/values.target*100 : 0).toFixed(1) + "%)"));
+            box.appendChild(row);
+        });
+        if (!box.children.length) box.textContent = "No data available";
+    } catch (e) { showStatus("accountStatus", e.message, true); }
+}
+async function loadIdealPage() {
+    try {
+        const d = await getAnalyticsData();
+        document.getElementById("idealToday").textContent = d.todayTarget;
+        document.getElementById("yourToday").textContent = d.todayStudy;
+        document.getElementById("todayGap").textContent = d.todayTarget - d.todayStudy;
+        document.getElementById("idealTotal").textContent = d.target;
+        document.getElementById("yourTotal").textContent = d.study;
+        document.getElementById("totalGap").textContent = d.target - d.study;
+        document.getElementById("interpretationText").textContent = d.study >= d.target
             ? "You are matching or exceeding the ideal learning pace."
-            : "You are behind the ideal learning pace. Improve consistency."
-    };
-    for (const [id, value] of Object.entries(values)) {
-        const element = getElement(id);
-        if (element) {
-            element.textContent = value;
-        }
-    }
+            : "You are behind the ideal learning pace. Improve consistency.";
+    } catch (e) { showStatus("accountStatus", e.message, true); }
 }
-
-function loadAnalysisPage() {
-    const data = getData();
-    const { totalStudy, totalTarget, subjectTotals, allDays } = calculateTotals(data);
-    const subjects = Object.entries(subjectTotals);
-    const strongest = subjects.length ? subjects.reduce((a, b) => a[1] >= b[1] ? a : b)[0] : "-";
-    const weakest = subjects.length ? subjects.reduce((a, b) => a[1] <= b[1] ? a : b)[0] : "-";
-    const values = {
-        analysisTotalStudy: totalStudy,
-        analysisTotalTarget: totalTarget,
-        analysisCompletion: totalTarget ? `${((totalStudy / totalTarget) * 100).toFixed(1)}%` : "0%",
-        analysisStreak: data.streak,
-        analysisAverage: allDays.size ? (totalStudy / allDays.size).toFixed(2) : "0",
-        strongestSubject: strongest,
-        weakestSubject: weakest,
-        reflectionText: data.streak >= 3
+async function loadAnalysisPage() {
+    try {
+        const d = await getAnalyticsData();
+        const values = Object.entries(d.bySubject);
+        const strongest = values.length ? values.reduce((a,b)=>b[1].study>a[1].study?b:a)[0] : "-";
+        const weakest = values.length ? values.reduce((a,b)=>b[1].study<a[1].study?b:a)[0] : "-";
+        document.getElementById("analysisTotalStudy").textContent = d.study;
+        document.getElementById("analysisTotalTarget").textContent = d.target;
+        document.getElementById("analysisCompletion").textContent = (d.target ? d.study/d.target*100 : 0).toFixed(1) + "%";
+        document.getElementById("analysisStreak").textContent = d.streak;
+        document.getElementById("analysisAverage").textContent = (d.days.size ? d.study/d.days.size : 0).toFixed(2);
+        document.getElementById("strongestSubject").textContent = strongest;
+        document.getElementById("weakestSubject").textContent = weakest;
+        document.getElementById("reflectionText").textContent = d.streak >= 3
             ? "You show good consistency. Keep maintaining your streak."
-            : "Your consistency needs improvement. Try to meet daily targets."
-    };
-    for (const [id, value] of Object.entries(values)) {
-        const element = getElement(id);
-        if (element) {
-            element.textContent = value;
-        }
-    }
+            : "Your consistency needs improvement. Try to meet daily targets.";
+    } catch (e) { showStatus("accountStatus", e.message, true); }
+}
+async function loadForecastPage() {
+    try {
+        const d = await getAnalyticsData();
+        const remaining = d.target - d.study, average = d.days.size ? d.study/d.days.size : 0;
+        document.getElementById("completedStudy").textContent = d.study;
+        document.getElementById("requiredStudy").textContent = d.target;
+        document.getElementById("remainingStudy").textContent = remaining;
+        document.getElementById("averageDaily").textContent = average.toFixed(2);
+        document.getElementById("totalDays").textContent = d.days.size;
+        document.getElementById("estimatedDays").textContent = remaining <= 0 ? "Completed" : average > 0 ? Math.ceil(remaining/average) + " days" : "Not enough data";
+    } catch (e) { showStatus("accountStatus", e.message, true); }
 }
 
-function loadForecastPage() {
-    const data = getData();
-    const { totalStudy, totalTarget, allDays } = calculateTotals(data);
-    const remaining = Math.max(totalTarget - totalStudy, 0);
-    const average = allDays.size ? totalStudy / allDays.size : 0;
-    const daysNeeded = average ? Math.ceil(remaining / average) : 0;
-    const values = {
-        completedStudy: totalStudy,
-        requiredStudy: totalTarget,
-        remainingStudy: remaining,
-        averageDaily: average.toFixed(2),
-        totalDays: allDays.size,
-        estimatedDays: daysNeeded > 0 ? `${daysNeeded} days` : "Not enough data"
-    };
-    for (const [id, value] of Object.entries(values)) {
-        const element = getElement(id);
-        if (element) {
-            element.textContent = value;
-        }
-    }
-}
+document.addEventListener("DOMContentLoaded", () => {
+    mountAccountUI();
+    loadCurrentPage();
+});
 
-if (typeof window !== "undefined" && typeof document !== "undefined") {
-    const initialData = getData();
-    if (Object.keys(initialData.subjects).length === 0) {
-        initialData.subjects["General Study"] = { history: {}, targets: {} };
-        saveData(initialData);
-    }
-}
-
-if (typeof module !== "undefined") {
-    module.exports = {
-        calculateTotals,
-        createDefaultData,
-        sanitiseData
-    };
+if (typeof window !== "undefined") {
+    window.studyTracker = { displayDate, todayISO };
 }
