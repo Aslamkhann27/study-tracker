@@ -43,6 +43,8 @@ The scheduled Render health-ping workflow accepts the optional repository
 Actions variable `RENDER_HEALTH_URL`. When it is not configured, it safely
 checks the public production endpoint
 `https://study-tracker-backend-lt40.onrender.com/api/health/`.
+The probe retries transient connection, timeout and HTTP failures for up to
+two minutes so a cold-starting Render service does not cause a false failure.
 
 The application falls back to SQLite only when `DATABASE_URL` is absent. Production should use Neon. Render runs migrations during each build before starting Gunicorn.
 

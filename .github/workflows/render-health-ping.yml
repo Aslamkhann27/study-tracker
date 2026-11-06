@@ -11,7 +11,7 @@ permissions:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
       - name: Check Render API health
         env:
@@ -19,4 +19,14 @@ jobs:
         run: |
           HEALTH_URL="${HEALTH_URL:-https://study-tracker-backend-lt40.onrender.com/api/health/}"
           echo "Checking ${HEALTH_URL}"
-          curl --fail --silent --show-error --max-time 20 "$HEALTH_URL"
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 5 \
+            --retry-all-errors \
+            --retry-delay 5 \
+            --retry-max-time 120 \
+            --connect-timeout 10 \
+            --max-time 30 \
+            "$HEALTH_URL"
