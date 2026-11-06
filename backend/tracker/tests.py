@@ -1,4 +1,5 @@
 from datetime import date
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -134,7 +135,19 @@ class ThrottlingTests(APITestCase):
 
 
 class HealthEndpointTests(APITestCase):
-    def test_health_is_public_and_checks_database(self):
+    def test_health_is_public_and_checks_database_and_cache(self):
         response = self.client.get("/api/health/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"status": "ok", "database": "ok"})
+        self.assertEqual(
+            response.data,
+            {"status": "ok", "database": "ok", "cache": "ok"},
+        )
+
+    @patch("tracker.views.cache.set", side_effect=ConnectionError("cache unavailable"))
+    def test_health_reports_cache_failure(self, _mock_cache_set):
+        response = self.client.get("/api/health/")
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(
+            response.data,
+            {"status": "unhealthy", "database": "ok", "cache": "unavailable"},
+        )

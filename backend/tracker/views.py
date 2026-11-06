@@ -1,5 +1,7 @@
+import uuid
 from datetime import timedelta
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.db import connection
 from django.db.models import Sum
 from django.utils import timezone
@@ -106,11 +108,26 @@ def dashboard(request):
 @permission_classes([AllowAny])
 @throttle_classes([])
 def health(request):
-    """Public database health endpoint; exempt from auth throttling for monitoring."""
+    """Public health endpoint; verifies database and configured cache connectivity."""
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
     except Exception:
         return Response({"status": "unhealthy", "database": "unavailable"}, status=503)
-    return Response({"status": "ok", "database": "ok"})
+
+    # A write/read/delete round trip verifies that the configured cache backend
+    # (Redis in production when REDIS_URL is set) is actually reachable.
+    probe_key = f"healthcheck:{uuid.uuid4().hex}"
+    try:
+        cache.set(probe_key, "ok", timeout=10)
+        if cache.get(probe_key) != "ok":
+            raise RuntimeError("Cache health check round trip failed")
+        cache.delete(probe_key)
+    except Exception:
+        return Response(
+            {"status": "unhealthy", "database": "ok", "cache": "unavailable"},
+            status=503,
+        )
+
+    return Response({"status": "ok", "database": "ok", "cache": "ok"})
