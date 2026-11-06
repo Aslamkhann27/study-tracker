@@ -319,3 +319,14 @@ Study Tracker is intended to evolve into a **decision-making system**, helping s
 3. **Am I improving?** — Is my actual understanding getting better?
 
 All items in this section describe the future direction of the product. They should be marked as implemented in the README only after the corresponding functionality has been built and tested.
+
+
+## Phase 1 — Backend Audit Deliverables
+
+The initial SIS backend audit and implementation baseline are documented here:
+
+- [Existing Project Technical Audit](docs/PHASE_1_AUDIT.md)
+- [Proposed Backend Architecture](docs/BACKEND_ARCHITECTURE.md)
+- [Development Priorities and Execution Backlog](docs/DEVELOPMENT_PRIORITIES.md)
+
+The audit is based on source and GitHub Actions evidence. Production Render/Neon settings and live browser flows remain unverified until tested with hosting access.
