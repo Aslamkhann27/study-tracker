@@ -4,7 +4,7 @@ from django.db import connection
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import generics, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.exceptions import TokenError
@@ -14,39 +14,63 @@ from .serializers import RegisterSerializer, SubjectSerializer, StudyEntrySerial
 
 User = get_user_model()
 
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
+
 class LogoutView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        refresh = request.data.get("refresh")
-        if not refresh:
+        refresh_value = request.data.get("refresh")
+        if not refresh_value:
             return Response({"detail": "Refresh token is required."}, status=400)
+
         try:
-            RefreshToken(refresh).blacklist()
+            refresh = RefreshToken(refresh_value)
+        except TokenError:
+            return Response({"detail": "Invalid refresh token."}, status=400)
+
+        # A valid token is not sufficient: it must belong to the authenticated
+        # caller. Otherwise one user could revoke another user's refresh token.
+        if str(refresh.get("user_id")) != str(request.user.pk):
+            return Response(
+                {"detail": "Refresh token does not belong to the authenticated user."},
+                status=403,
+            )
+
+        try:
+            refresh.blacklist()
         except TokenError:
             return Response({"detail": "Invalid refresh token."}, status=400)
         return Response(status=204)
 
+
 class SubjectViewSet(viewsets.ModelViewSet):
     serializer_class = SubjectSerializer
+
     def get_queryset(self):
         return Subject.objects.filter(user=self.request.user)
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+
 class StudyEntryViewSet(viewsets.ModelViewSet):
     serializer_class = StudyEntrySerializer
+
     def get_queryset(self):
         return StudyEntry.objects.filter(user=self.request.user).select_related("subject")
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
     def perform_update(self, serializer):
         serializer.save(user=self.request.user)
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -80,8 +104,9 @@ def dashboard(request):
 
 @api_view(["GET", "HEAD"])
 @permission_classes([AllowAny])
+@throttle_classes([])
 def health(request):
-    """Public health endpoint that verifies database connectivity."""
+    """Public database health endpoint; exempt from auth throttling for monitoring."""
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
