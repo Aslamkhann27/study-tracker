@@ -267,7 +267,8 @@
         await loadExams();
     }
 
-    document.addEventListener("DOMContentLoaded", async () => {
+    // Called by script.js both on initial page load and after a successful login.
+    window.studyTrackerAcademicInit = async () => {
         const page = location.pathname.split("/").pop();
         const init = {
             "profile.html": initProfile,
@@ -275,13 +276,12 @@
             "exams.html": initExams
         }[page];
         if (!init) return;
+        const target = page === "profile.html" ? "profileMessage"
+            : page === "syllabus.html" ? "chapterMessage" : "examMessage";
         try {
-            if (typeof requireLogin === "function" && !await requireLogin()) return;
             await init();
         } catch (error) {
-            const target = page === "profile.html" ? "profileMessage"
-                : page === "syllabus.html" ? "chapterMessage" : "examMessage";
             message(target, error.message || "Unable to load this page.", true);
         }
-    });
+    };
 })();
