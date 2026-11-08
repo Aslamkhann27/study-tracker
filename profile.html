@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Profile | Study Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="today.html">Today</a>
+        <a href="profile.html">Academic Profile</a>
+        <a href="syllabus.html">Syllabus</a>
+        <a href="exams.html">Exams</a>
+        <a href="progress.html">Progress</a>
+        <a href="ideal.html">Ideal</a>
+        <a href="analysis.html">Analysis</a>
+        <a href="forecast.html">Forecast</a>
+    </nav>
+    <main class="container">
+        <h1>Academic Profile</h1>
+        <p>Set up your academic details and daily study capacity.</p>
+        <section class="card">
+            <form id="profileForm">
+                <label for="course">Course</label>
+                <input id="course" name="course" maxlength="100" placeholder="e.g. B.Tech">
+                <label for="branch">Branch</label>
+                <input id="branch" name="branch" maxlength="100" placeholder="e.g. Computer Science & Engineering">
+                <label for="academic_session">Academic session</label>
+                <input id="academic_session" name="academic_session" maxlength="20" placeholder="e.g. 2026-27">
+                <label for="semester">Semester</label>
+                <input id="semester" name="semester" type="number" min="1" max="12" value="1" required>
+                <label for="daily_available_hours">Daily available study hours</label>
+                <input id="daily_available_hours" name="daily_available_hours" type="number" min="0" max="24" step="0.25" value="4" required>
+                <button type="submit" id="profileSave">Save Academic Profile</button>
+            </form>
+            <p id="profileMessage" class="status-message" role="status" aria-live="polite"></p>
+        </section>
+    </main>
+    <script src="api-config.js"></script>
+    <script src="script.js"></script>
+    <script src="academic.js"></script>
+</body>
+</html>

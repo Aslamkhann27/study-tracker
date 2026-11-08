@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syllabus Manager | Study Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="today.html">Today</a>
+        <a href="profile.html">Academic Profile</a>
+        <a href="syllabus.html">Syllabus</a>
+        <a href="exams.html">Exams</a>
+        <a href="progress.html">Progress</a>
+        <a href="ideal.html">Ideal</a>
+        <a href="analysis.html">Analysis</a>
+        <a href="forecast.html">Forecast</a>
+    </nav>
+    <main class="container">
+        <h1>Syllabus Manager</h1>
+        <p>Organize your learning as Subject → Chapter → Topic.</p>
+
+        <section class="card">
+            <h2>1. Select Subject</h2>
+            <label for="syllabusSubject">Subject</label>
+            <select id="syllabusSubject"></select>
+            <p id="syllabusSubjectMessage" class="status-message" role="status"></p>
+        </section>
+
+        <section class="card">
+            <h2>2. Add Chapter</h2>
+            <form id="chapterForm">
+                <label for="chapterTitle">Chapter title</label>
+                <input id="chapterTitle" maxlength="150" required placeholder="e.g. Introduction to Operating Systems">
+                <label for="chapterDescription">Description (optional)</label>
+                <textarea id="chapterDescription" rows="2"></textarea>
+                <label for="chapterOrder">Display order</label>
+                <input id="chapterOrder" type="number" min="0" value="0">
+                <button type="submit">Add Chapter</button>
+            </form>
+            <p id="chapterMessage" class="status-message" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="card">
+            <h2>3. Chapters</h2>
+            <label for="chapterSelect">Select chapter</label>
+            <select id="chapterSelect"></select>
+            <div id="chapterList" class="item-list"></div>
+        </section>
+
+        <section class="card">
+            <h2>4. Add Topic to Selected Chapter</h2>
+            <form id="topicForm">
+                <label for="topicTitle">Topic title</label>
+                <input id="topicTitle" maxlength="150" required placeholder="e.g. Process Scheduling">
+                <label for="topicDescription">Description (optional)</label>
+                <textarea id="topicDescription" rows="2"></textarea>
+                <label for="topicOrder">Display order</label>
+                <input id="topicOrder" type="number" min="0" value="0">
+                <button type="submit">Add Topic</button>
+            </form>
+            <p id="topicMessage" class="status-message" role="status" aria-live="polite"></p>
+            <h3>Topics and progress</h3>
+            <div id="topicList" class="item-list"></div>
+        </section>
+    </main>
+    <script src="api-config.js"></script>
+    <script src="script.js"></script>
+    <script src="academic.js"></script>
+</body>
+</html>
