@@ -204,6 +204,7 @@ async function loadCurrentPage() {
         "analysis.html": loadAnalysisPage, "forecast.html": loadForecastPage
     };
     if (loaders[page]) await loaders[page]();
+    else if (typeof window.studyTrackerAcademicInit === "function") await window.studyTrackerAcademicInit();
 }
 
 /* TODAY */
